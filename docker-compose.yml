@@ -1,0 +1,28 @@
+services:
+  balsp:
+    build: .
+    container_name: balsp
+    restart: unless-stopped
+    ports:
+      - "5050:5000"
+    volumes:
+      # Persister la base de données et les logos entre redémarrages
+      - balsp_data:/app/instance
+      - balsp_logos:/app/static/uploads/logos
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - FERNET_KEY=${FERNET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:5050}
+      - GUNICORN_WORKERS=2
+    networks:
+      - comet_network
+
+volumes:
+  balsp_data:
+  balsp_logos:
+
+networks:
+  comet_network:
+    external: true
