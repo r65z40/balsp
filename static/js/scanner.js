@@ -24,6 +24,8 @@
   const resultTotal = document.getElementById('result-total');
   const resultProgress = document.getElementById('result-progress');
   const resultMessage = document.getElementById('result-message');
+  const resultGuests = document.getElementById('result-guests');
+  const guestList = document.getElementById('guest-list');
 
   function showMessage(type, text) {
     resultMessage.className = `alert alert-${type}`;
@@ -33,6 +35,44 @@
   function clearMessage() {
     resultMessage.className = 'alert d-none';
     resultMessage.textContent = '';
+  }
+
+  function renderGuests(guests) {
+    guestList.innerHTML = '';
+    if (!guests || guests.length === 0) {
+      resultGuests.classList.add('d-none');
+      return;
+    }
+    resultGuests.classList.remove('d-none');
+    guests.forEach(g => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex justify-content-between align-items-center';
+      const badge = g.checked_in
+        ? '<span class="badge text-bg-success me-2">Arrivé</span>'
+        : '<span class="badge text-bg-light me-2">Attendu</span>';
+      li.innerHTML = `
+        <span>${badge}${g.name}</span>
+        <button class="btn btn-sm ${g.checked_in ? 'btn-outline-secondary' : 'btn-outline-success'} guest-toggle" data-id="${g.id}">
+          ${g.checked_in ? 'Annuler' : 'Pointer'}
+        </button>
+      `;
+      guestList.appendChild(li);
+    });
+
+    guestList.querySelectorAll('.guest-toggle').forEach(btn => {
+      btn.addEventListener('click', () => toggleGuest(parseInt(btn.dataset.id)));
+    });
+  }
+
+  async function toggleGuest(guestId) {
+    const { ok, data } = await apiPost('/scan/guest-toggle', { guest_id: guestId });
+    if (!ok || !data.ok) {
+      showMessage('danger', data.error || 'Erreur.');
+      return;
+    }
+    renderSponsor(data.sponsor);
+    const action = data.guest.checked_in ? 'pointé' : 'dépointé';
+    showMessage('info', `${data.guest.name} ${action}.`);
   }
 
   function renderSponsor(sponsor) {
@@ -54,6 +94,7 @@
     resultProgress.style.width = pct + '%';
     resultProgress.classList.toggle('bg-success', sponsor.is_full);
     resultProgress.classList.toggle('bg-warning', !sponsor.is_full && pct >= 50);
+    renderGuests(sponsor.guests);
   }
 
   async function apiPost(url, body) {
@@ -118,6 +159,7 @@
     currentToken = null;
     resultCard.classList.add('d-none');
     placeholder.classList.remove('d-none');
+    resultGuests.classList.add('d-none');
     manualInput.value = '';
   }
 

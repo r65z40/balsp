@@ -51,6 +51,7 @@ class Sponsor(db.Model):
     amount = db.Column(db.Numeric(10, 2), nullable=True)
     tier = db.Column(db.Enum(Tier), nullable=False)
     custom_invitations = db.Column(db.Integer, nullable=True)
+    bonus_invitations = db.Column(db.Integer, nullable=False, default=0)
     total_invitations = db.Column(db.Integer, nullable=False, default=0)
     entries_count = db.Column(db.Integer, nullable=False, default=0)
 
@@ -65,6 +66,12 @@ class Sponsor(db.Model):
         backref="sponsor",
         cascade="all, delete-orphan",
         order_by="ScanLog.scanned_at.desc()",
+    )
+    guests = db.relationship(
+        "Guest",
+        backref="sponsor",
+        cascade="all, delete-orphan",
+        order_by="Guest.id",
     )
 
     @property
@@ -85,6 +92,18 @@ class ScanLog(db.Model):
     )
     count = db.Column(db.Integer, nullable=False, default=1)
     scanned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Guest(db.Model):
+    __tablename__ = "guests"
+
+    id = db.Column(db.Integer, primary_key=True)
+    sponsor_id = db.Column(
+        db.Integer, db.ForeignKey("sponsors.id", ondelete="CASCADE"), nullable=False
+    )
+    name = db.Column(db.String(200), nullable=False)
+    checked_in = db.Column(db.Boolean, nullable=False, default=False)
+    checked_in_at = db.Column(db.DateTime, nullable=True)
 
 
 class SmtpConfig(db.Model):

@@ -21,7 +21,7 @@ from werkzeug.utils import secure_filename
 
 from extensions import db
 from forms import SponsorForm
-from models import EmailTemplate, SmtpConfig, Sponsor, Tier
+from models import EmailTemplate, Guest, SmtpConfig, Sponsor, Tier
 from utils.mailer import SmtpSettings, send_invitation_email
 from utils.qr import generate_qr_data_url, generate_qr_png
 from utils.tiers import compute_invitations, tier_from_amount
@@ -60,19 +60,20 @@ def _apply_form_to_sponsor(form: SponsorForm, sponsor: Sponsor) -> None:
     sponsor.contact_name = form.contact_name.data.strip()
     sponsor.contact_email = form.contact_email.data.strip()
     sponsor.contact_phone = (form.contact_phone.data or "").strip() or None
+    sponsor.bonus_invitations = form.bonus_invitations.data or 0
 
     if form.is_donor.data:
         sponsor.tier = Tier.DONOR
         sponsor.amount = form.amount.data  # peut être None
         sponsor.custom_invitations = int(form.custom_invitations.data)
-        sponsor.total_invitations = compute_invitations(
-            Tier.DONOR, sponsor.custom_invitations
-        )
+        base = compute_invitations(Tier.DONOR, sponsor.custom_invitations)
     else:
         sponsor.amount = form.amount.data
         sponsor.tier = tier_from_amount(form.amount.data)
         sponsor.custom_invitations = None
-        sponsor.total_invitations = compute_invitations(sponsor.tier)
+        base = compute_invitations(sponsor.tier)
+
+    sponsor.total_invitations = base + sponsor.bonus_invitations
 
 
 @bp.route("/")
@@ -120,6 +121,7 @@ def edit(sponsor_id: int):
         form.is_donor.data = sponsor.tier == Tier.DONOR
         form.custom_invitations.data = sponsor.custom_invitations
         form.amount.data = sponsor.amount
+        form.bonus_invitations.data = sponsor.bonus_invitations
 
     if form.validate_on_submit():
         try:
@@ -183,3 +185,28 @@ def send_email(sponsor_id: int):
         current_app.logger.exception("Erreur d'envoi d'email")
         flash(f"Erreur lors de l'envoi : {exc}", "danger")
     return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
+
+
+@bp.route("/<int:sponsor_id>/guests/add", methods=["POST"])
+@login_required
+def add_guest(sponsor_id: int):
+    sponsor = Sponsor.query.get_or_404(sponsor_id)
+    name = (request.form.get("guest_name") or "").strip()
+    if not name:
+        flash("Veuillez saisir un nom d'invité.", "warning")
+    else:
+        guest = Guest(sponsor_id=sponsor.id, name=name)
+        db.session.add(guest)
+        db.session.commit()
+        flash(f"Invité « {name} » ajouté.", "success")
+    return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
+
+
+@bp.route("/<int:sponsor_id>/guests/<int:guest_id>/delete", methods=["POST"])
+@login_required
+def delete_guest(sponsor_id: int, guest_id: int):
+    guest = Guest.query.filter_by(id=guest_id, sponsor_id=sponsor_id).first_or_404()
+    db.session.delete(guest)
+    db.session.commit()
+    flash("Invité supprimé.", "success")
+    return redirect(url_for("sponsors.detail", sponsor_id=sponsor_id))

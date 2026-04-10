@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import login_required
 
 from extensions import csrf, db
-from models import ScanLog, Sponsor
+from models import Guest, ScanLog, Sponsor
 
 bp = Blueprint("scan", __name__, url_prefix="/scan")
 
@@ -20,6 +20,14 @@ def _sponsor_payload(sponsor: Sponsor) -> dict:
     logo_url = None
     if sponsor.logo_filename:
         logo_url = url_for("static", filename=f"uploads/logos/{sponsor.logo_filename}")
+    guests = [
+        {
+            "id": g.id,
+            "name": g.name,
+            "checked_in": g.checked_in,
+        }
+        for g in sponsor.guests
+    ]
     return {
         "id": sponsor.id,
         "company_name": sponsor.company_name,
@@ -31,6 +39,7 @@ def _sponsor_payload(sponsor: Sponsor) -> dict:
         "remaining": sponsor.remaining_invitations,
         "is_full": sponsor.is_full,
         "logo_url": logo_url,
+        "guests": guests,
     }
 
 
@@ -112,5 +121,28 @@ def undo():
     return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})
 
 
-# Les endpoints JSON acceptent un POST depuis le JS de la page scan ; CSRF
-# est géré via le header X-CSRFToken injecté côté client.
+@bp.route("/guest-toggle", methods=["POST"])
+@login_required
+def guest_toggle():
+    """Bascule le statut checked_in d'un invité nommé."""
+    data = request.get_json(silent=True) or {}
+    guest_id = data.get("guest_id")
+    if not guest_id:
+        return jsonify({"ok": False, "error": "ID invité manquant."}), 400
+
+    guest = db.session.get(Guest, guest_id)
+    if not guest:
+        return jsonify({"ok": False, "error": "Invité inconnu."}), 404
+
+    from datetime import datetime
+
+    guest.checked_in = not guest.checked_in
+    guest.checked_in_at = datetime.utcnow() if guest.checked_in else None
+    db.session.commit()
+
+    sponsor = guest.sponsor
+    return jsonify({
+        "ok": True,
+        "guest": {"id": guest.id, "name": guest.name, "checked_in": guest.checked_in},
+        "sponsor": _sponsor_payload(sponsor),
+    })

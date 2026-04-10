@@ -69,6 +69,40 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         db.session.commit()
         click.echo("Base de données initialisée.")
 
+    @app.cli.command("migrate-db")
+    def migrate_db():
+        """Ajoute les colonnes/tables manquantes sur une base existante."""
+        from sqlalchemy import inspect, text
+
+        inspector = inspect(db.engine)
+        existing_tables = inspector.get_table_names()
+
+        # Table guests (nouvelle)
+        if "guests" not in existing_tables:
+            from models import Guest
+
+            Guest.__table__.create(db.engine)
+            click.echo("Table 'guests' créée.")
+        else:
+            click.echo("Table 'guests' déjà présente.")
+
+        # Colonne bonus_invitations sur sponsors
+        if "sponsors" in existing_tables:
+            cols = {c["name"] for c in inspector.get_columns("sponsors")}
+            if "bonus_invitations" not in cols:
+                db.session.execute(
+                    text(
+                        "ALTER TABLE sponsors "
+                        "ADD COLUMN bonus_invitations INTEGER NOT NULL DEFAULT 0"
+                    )
+                )
+                db.session.commit()
+                click.echo("Colonne 'bonus_invitations' ajoutée à sponsors.")
+            else:
+                click.echo("Colonne 'bonus_invitations' déjà présente.")
+
+        click.echo("Migration terminée.")
+
     return app
 
 

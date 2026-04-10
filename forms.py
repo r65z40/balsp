@@ -64,6 +64,11 @@ class SponsorForm(FlaskForm):
         "Nombre d'invitations (donateur)",
         validators=[Optional(), NumberRange(min=0, max=200)],
     )
+    bonus_invitations = IntegerField(
+        "Invitations bonus supplémentaires",
+        validators=[Optional(), NumberRange(min=0, max=200)],
+        default=0,
+    )
 
     submit = SubmitField("Enregistrer")
 
