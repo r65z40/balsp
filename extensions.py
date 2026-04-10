@@ -8,5 +8,5 @@ login_manager = LoginManager()
 csrf = CSRFProtect()
 
 login_manager.login_view = "auth.login"
-login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
+login_manager.login_message = "Connectez-vous pour accéder à la billetterie du Bal des Pompiers."
 login_manager.login_message_category = "warning"

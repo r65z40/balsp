@@ -1,8 +1,9 @@
-# balsp — Billetterie Sponsors
+# balsp — Bal des Sapeurs-Pompiers d'Auxerre
 
-Application web légère pour gérer les invitations offertes aux sponsors d'un
-concert annuel : saisie des sponsors, génération d'un QR code, envoi par email
-personnalisable, et pointage des entrées à l'accueil via la caméra.
+Application web pour gérer les invitations offertes aux sponsors du
+Bal des Pompiers d'Auxerre : saisie des sponsors, génération d'un QR code,
+envoi par email personnalisable, et pointage des entrées à l'accueil via
+la caméra.
 
 ## Fonctionnalités
 
@@ -82,7 +83,7 @@ Dans **Paramètres → Modèle d'email**, vous pouvez :
 
 Les navigateurs exigent **HTTPS** pour autoriser l'accès à la caméra (sauf sur
 `localhost`). Pour utiliser un téléphone sur le réseau local à l'entrée du
-concert :
+bal :
 
 ```bash
 pip install pyopenssl           # Certificat auto-signé

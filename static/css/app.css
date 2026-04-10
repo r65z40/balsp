@@ -1,17 +1,140 @@
-body {
-  background-color: #f5f6f8;
+/* ============================================
+   Bal des Pompiers d'Auxerre — Thème pompiers
+   ============================================ */
+
+:root {
+  --pompier-red: #c8102e;
+  --pompier-dark: #8b0000;
+  --pompier-light: #fde8eb;
+  --pompier-orange: #e8590c;
+  --pompier-gold: #f0a500;
+  --pompier-gray: #2b2b2b;
 }
 
+body {
+  background-color: #f8f0f0;
+}
+
+/* Navbar pompier */
+.navbar-pompier {
+  background: linear-gradient(135deg, var(--pompier-dark) 0%, var(--pompier-red) 100%);
+  border-bottom: 3px solid var(--pompier-gold);
+}
+
+.navbar-pompier .navbar-brand {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.navbar-pompier .nav-link:hover {
+  color: var(--pompier-gold) !important;
+}
+
+/* Cards */
 .card {
   border: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(139, 0, 0, 0.08);
+  border-radius: 10px;
 }
 
+/* Boutons rouges partout */
+.btn-primary,
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary:active {
+  background-color: var(--pompier-red) !important;
+  border-color: var(--pompier-red) !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--pompier-dark) !important;
+  border-color: var(--pompier-dark) !important;
+}
+
+.btn-outline-primary {
+  color: var(--pompier-red);
+  border-color: var(--pompier-red);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--pompier-red);
+  border-color: var(--pompier-red);
+  color: #fff;
+}
+
+/* Cards stat dashboard */
+.stat-sponsors {
+  background: linear-gradient(135deg, var(--pompier-red) 0%, var(--pompier-dark) 100%);
+  color: #fff;
+}
+
+.stat-invitations {
+  background: linear-gradient(135deg, var(--pompier-orange) 0%, #c92a2a 100%);
+  color: #fff;
+}
+
+.stat-entries {
+  background: linear-gradient(135deg, var(--pompier-gold) 0%, var(--pompier-orange) 100%);
+  color: #fff;
+}
+
+/* Progress bars */
+.progress-bar {
+  background-color: var(--pompier-red);
+}
+
+.progress-bar.bg-success {
+  background-color: var(--pompier-gold) !important;
+}
+
+/* Badge tier */
+.badge.text-bg-secondary {
+  background-color: var(--pompier-dark) !important;
+}
+
+/* Login */
+.login-card {
+  border-top: 4px solid var(--pompier-red);
+}
+
+.login-header {
+  color: var(--pompier-red);
+  font-weight: 700;
+}
+
+/* Scanner */
 #qr-reader {
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
+  border: 3px solid var(--pompier-red);
 }
 
-.display-4 {
-  font-weight: 600;
+#result-card .display-4 {
+  color: var(--pompier-red);
+}
+
+.display-4, .display-5 {
+  font-weight: 700;
+}
+
+/* Liens */
+a {
+  color: var(--pompier-red);
+}
+
+a:hover {
+  color: var(--pompier-dark);
+}
+
+/* Dropdown */
+.dropdown-menu {
+  border-top: 2px solid var(--pompier-gold);
+}
+
+/* Footer texte */
+.footer-pompier {
+  color: #999;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 2rem 0 1rem;
 }

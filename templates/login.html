@@ -1,11 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Connexion — balsp{% endblock %}
+{% block title %}Connexion — Bal des Pompiers d'Auxerre{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-5">
-    <div class="card shadow-sm">
+    <div class="card shadow-sm login-card">
       <div class="card-body">
-        <h3 class="card-title mb-4">Connexion</h3>
+        <div class="text-center mb-4">
+          <div style="font-size: 3rem;">&#x1F6A8;</div>
+          <h3 class="login-header">Bal des Pompiers</h3>
+          <p class="text-muted">Sapeurs-Pompiers d'Auxerre</p>
+        </div>
         <form method="post">
           {{ form.hidden_tag() }}
           <div class="mb-3">
