@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Sponsors — balsp{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Sponsors</h1>
+  <a href="{{ url_for('sponsors.new_sponsor') }}" class="btn btn-primary">+ Nouveau sponsor</a>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Entreprise</th>
+          <th>Contact</th>
+          <th>Montant</th>
+          <th>Tier</th>
+          <th>Invitations</th>
+          <th>Email</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sponsors %}
+        <tr>
+          <td>
+            {% if s.logo_filename %}
+              <img src="{{ url_for('static', filename='uploads/logos/' ~ s.logo_filename) }}" alt="" height="40">
+            {% endif %}
+          </td>
+          <td><strong>{{ s.company_name }}</strong></td>
+          <td>
+            {{ s.contact_name }}<br>
+            <small class="text-muted">{{ s.contact_email }}</small>
+          </td>
+          <td>{% if s.amount %}{{ '%.2f'|format(s.amount) }} €{% else %}—{% endif %}</td>
+          <td><span class="badge text-bg-secondary">{{ s.tier.label }}</span></td>
+          <td>{{ s.entries_count }} / {{ s.total_invitations }}</td>
+          <td>
+            {% if s.email_sent_at %}
+              <span class="badge text-bg-success" title="{{ s.email_sent_at.strftime('%d/%m/%Y %H:%M') }}">Envoyé</span>
+            {% else %}
+              <span class="badge text-bg-warning">En attente</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('sponsors.detail', sponsor_id=s.id) }}" class="btn btn-sm btn-outline-primary">Fiche</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">Aucun sponsor enregistré.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

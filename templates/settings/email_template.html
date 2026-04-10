@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Modèle d'email — balsp{% endblock %}
+{% block content %}
+<h1 class="h3 mb-4">Modèle d'email d'invitation</h1>
+
+<div class="row">
+  <div class="col-lg-8">
+    <form method="post" class="card">
+      <div class="card-body">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.subject.label(class="form-label") }}
+          {{ form.subject(class="form-control") }}
+          {% for err in form.subject.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-3">
+          {{ form.body_html.label(class="form-label") }}
+          {{ form.body_html(class="form-control") }}
+          <div class="form-text">
+            HTML accepté. Utilisez la syntaxe <code>${variable}</code> pour insérer les données du sponsor.
+          </div>
+          {% for err in form.body_html.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {{ form.submit(class="btn btn-primary") }}
+          {{ form.preview(class="btn btn-outline-info") }}
+          {{ form.restore(class="btn btn-outline-warning", onclick="return confirm('Restaurer le modèle par défaut ?');") }}
+        </div>
+
+        <hr>
+        <div class="row align-items-end">
+          <div class="col-md-8 mb-3">
+            {{ form.test_recipient.label(class="form-label") }}
+            {{ form.test_recipient(class="form-control", placeholder="votre@email.fr") }}
+          </div>
+          <div class="col-md-4 mb-3 d-grid">
+            {{ form.send_test(class="btn btn-outline-success") }}
+          </div>
+        </div>
+        <small class="text-muted">
+          L'envoi de test utilise le contenu actuel du formulaire (pas encore sauvegardé)
+          et un sponsor fictif.
+        </small>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">Variables disponibles</div>
+      <ul class="list-group list-group-flush">
+        {% for var, label in [
+          ('entreprise', 'Nom de l\'entreprise'),
+          ('contact', 'Nom du contact'),
+          ('email', 'Email du contact'),
+          ('telephone', 'Téléphone'),
+          ('nb_invitations', 'Nombre d\'invitations'),
+          ('tier', 'Tier / niveau de sponsoring'),
+          ('montant', 'Montant en €'),
+          ('qr_cid', 'QR code (image inline)'),
+        ] %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <code>${{ '{' }}{{ var }}{{ '}' }}</code>
+            <div class="small text-muted">{{ label }}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary copy-var" data-var="${{ '{' }}{{ var }}{{ '}' }}">Copier</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="alert alert-secondary mt-3 small">
+      Pour afficher le QR code dans le corps du mail :
+      <br>
+      <code>&lt;img src="${qr_cid}" alt="QR code"&gt;</code>
+    </div>
+  </div>
+</div>
+
+{% if preview_html is defined and preview_html %}
+<div class="card mt-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>Aperçu du rendu</span>
+    <small class="text-muted">Sujet : <strong>{{ preview_subject }}</strong></small>
+  </div>
+  <div class="card-body p-0">
+    <iframe srcdoc="{{ preview_html|e }}" style="width:100%; height:500px; border:0;"></iframe>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  document.querySelectorAll('.copy-var').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.dataset.var);
+      btn.textContent = 'Copié !';
+      setTimeout(() => btn.textContent = 'Copier', 1200);
+    });
+  });
+</script>
+{% endblock %}

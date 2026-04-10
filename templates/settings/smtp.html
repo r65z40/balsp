@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Configuration SMTP — balsp{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-4">Configuration SMTP</h1>
+
+    <div class="alert alert-info">
+      Exemples :
+      <ul class="mb-0">
+        <li><strong>Gmail</strong> : host <code>smtp.gmail.com</code>, port <code>587</code>, STARTTLS, mot de passe d'application</li>
+        <li><strong>Outlook / Office365</strong> : host <code>smtp.office365.com</code>, port <code>587</code>, STARTTLS</li>
+        <li><strong>Yahoo</strong> : host <code>smtp.mail.yahoo.com</code>, port <code>587</code>, STARTTLS</li>
+      </ul>
+    </div>
+
+    <form method="post" class="card">
+      <div class="card-body">
+        {{ form.hidden_tag() }}
+
+        <div class="row">
+          <div class="col-md-8 mb-3">
+            {{ form.host.label(class="form-label") }}
+            {{ form.host(class="form-control") }}
+            {% for err in form.host.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+          </div>
+          <div class="col-md-4 mb-3">
+            {{ form.port.label(class="form-label") }}
+            {{ form.port(class="form-control") }}
+            {% for err in form.port.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          {{ form.username.label(class="form-label") }}
+          {{ form.username(class="form-control") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.password.label(class="form-label") }}
+          {{ form.password(class="form-control", autocomplete="new-password") }}
+          {% if cfg and cfg.password_encrypted %}
+            <div class="form-text">Un mot de passe est déjà enregistré. Laissez vide pour le conserver.</div>
+          {% endif %}
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3 form-check ms-2">
+            {{ form.use_tls(class="form-check-input") }}
+            {{ form.use_tls.label(class="form-check-label") }}
+          </div>
+          <div class="col-md-6 mb-3 form-check ms-2">
+            {{ form.use_ssl(class="form-check-input") }}
+            {{ form.use_ssl.label(class="form-check-label") }}
+          </div>
+          {% for err in form.use_ssl.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            {{ form.from_name.label(class="form-label") }}
+            {{ form.from_name(class="form-control") }}
+          </div>
+          <div class="col-md-6 mb-3">
+            {{ form.from_email.label(class="form-label") }}
+            {{ form.from_email(class="form-control") }}
+          </div>
+        </div>
+
+        <hr>
+        <div class="row align-items-end">
+          <div class="col-md-8 mb-3">
+            {{ form.test_recipient.label(class="form-label") }}
+            {{ form.test_recipient(class="form-control", placeholder="votre@email.fr") }}
+          </div>
+          <div class="col-md-4 mb-3 d-grid">
+            {{ form.test(class="btn btn-outline-info") }}
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end">
+          {{ form.submit(class="btn btn-primary") }}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

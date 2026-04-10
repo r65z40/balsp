@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+
+# Flask
+instance/
+.webassets-cache
+
+# Environnement
+.env
+.env.*
+!.env.example
+
+# Uploads (logos sponsors)
+static/uploads/logos/*
+!static/uploads/logos/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

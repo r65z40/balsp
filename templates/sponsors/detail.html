@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ sponsor.company_name }} — balsp{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+          {% if sponsor.logo_filename %}
+            <img src="{{ url_for('static', filename='uploads/logos/' ~ sponsor.logo_filename) }}" alt="logo" height="80" class="me-3">
+          {% endif %}
+          <div>
+            <h2 class="h3 mb-1">{{ sponsor.company_name }}</h2>
+            <span class="badge text-bg-secondary">{{ sponsor.tier.label }}</span>
+          </div>
+        </div>
+
+        <dl class="row">
+          <dt class="col-sm-4">Contact</dt>
+          <dd class="col-sm-8">{{ sponsor.contact_name }}</dd>
+
+          <dt class="col-sm-4">Email</dt>
+          <dd class="col-sm-8"><a href="mailto:{{ sponsor.contact_email }}">{{ sponsor.contact_email }}</a></dd>
+
+          <dt class="col-sm-4">Téléphone</dt>
+          <dd class="col-sm-8">{{ sponsor.contact_phone or '—' }}</dd>
+
+          <dt class="col-sm-4">Montant</dt>
+          <dd class="col-sm-8">{% if sponsor.amount %}{{ '%.2f'|format(sponsor.amount) }} €{% else %}—{% endif %}</dd>
+
+          <dt class="col-sm-4">Invitations</dt>
+          <dd class="col-sm-8">
+            <strong>{{ sponsor.entries_count }} / {{ sponsor.total_invitations }}</strong> entrées enregistrées
+          </dd>
+
+          <dt class="col-sm-4">Email envoyé</dt>
+          <dd class="col-sm-8">
+            {% if sponsor.email_sent_at %}
+              le {{ sponsor.email_sent_at.strftime('%d/%m/%Y à %H:%M') }}
+            {% else %}
+              <span class="text-muted">Pas encore envoyé</span>
+            {% endif %}
+          </dd>
+        </dl>
+
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('sponsors.edit', sponsor_id=sponsor.id) }}" class="btn btn-outline-primary">Modifier</a>
+          <form method="post" action="{{ url_for('sponsors.send_email', sponsor_id=sponsor.id) }}" class="d-inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-success">
+              {% if sponsor.email_sent_at %}Renvoyer l'email{% else %}Envoyer l'invitation{% endif %}
+            </button>
+          </form>
+          <a href="{{ url_for('sponsors.list_sponsors') }}" class="btn btn-outline-secondary ms-auto">Retour</a>
+        </div>
+      </div>
+    </div>
+
+    {% if sponsor.scan_logs %}
+    <div class="card">
+      <div class="card-header">Historique des pointages</div>
+      <ul class="list-group list-group-flush">
+        {% for log in sponsor.scan_logs %}
+        <li class="list-group-item d-flex justify-content-between">
+          <span>{{ log.scanned_at.strftime('%d/%m/%Y %H:%M:%S') }}</span>
+          <span class="badge text-bg-primary">+{{ log.count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header">QR code d'invitation</div>
+      <div class="card-body text-center">
+        <img src="{{ qr_data_url }}" alt="QR code" class="img-fluid" style="max-width: 260px;">
+        <div class="mt-3">
+          <a href="{{ url_for('sponsors.qr_png', sponsor_id=sponsor.id) }}" class="btn btn-sm btn-outline-secondary" download="qr-{{ sponsor.company_name|replace(' ', '-') }}.png">
+            Télécharger PNG
+          </a>
+        </div>
+        <small class="text-muted d-block mt-2">Token : <code>{{ sponsor.invitation_token }}</code></small>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

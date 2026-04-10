@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord — balsp{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Tableau de bord</h1>
+  <div>
+    <a href="{{ url_for('sponsors.new_sponsor') }}" class="btn btn-primary">+ Nouveau sponsor</a>
+    <a href="{{ url_for('scan.page') }}" class="btn btn-success">Ouvrir le scanner</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card text-bg-primary h-100">
+      <div class="card-body">
+        <div class="text-uppercase small opacity-75">Sponsors</div>
+        <div class="display-5">{{ total_sponsors }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-bg-info h-100">
+      <div class="card-body">
+        <div class="text-uppercase small opacity-75">Invitations totales</div>
+        <div class="display-5">{{ total_invitations }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-bg-success h-100">
+      <div class="card-body">
+        <div class="text-uppercase small opacity-75">Entrées enregistrées</div>
+        <div class="display-5">{{ total_entries }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Sponsors récents</div>
+  <div class="table-responsive">
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>Entreprise</th>
+          <th>Tier</th>
+          <th>Invitations</th>
+          <th>Progression</th>
+          <th>Email</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sponsors %}
+        <tr>
+          <td>
+            {% if s.logo_filename %}
+              <img src="{{ url_for('static', filename='uploads/logos/' ~ s.logo_filename) }}" alt="" height="30" class="me-2">
+            {% endif %}
+            {{ s.company_name }}
+          </td>
+          <td><span class="badge text-bg-secondary">{{ s.tier.label }}</span></td>
+          <td>{{ s.entries_count }} / {{ s.total_invitations }}</td>
+          <td style="min-width: 150px;">
+            {% set pct = (s.entries_count / s.total_invitations * 100) if s.total_invitations else 0 %}
+            <div class="progress" style="height: 8px;">
+              <div class="progress-bar {% if s.is_full %}bg-success{% endif %}" style="width: {{ pct }}%"></div>
+            </div>
+          </td>
+          <td>
+            {% if s.email_sent_at %}
+              <span class="badge text-bg-success">Envoyé</span>
+            {% else %}
+              <span class="badge text-bg-warning">Non envoyé</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('sponsors.detail', sponsor_id=s.id) }}" class="btn btn-sm btn-outline-primary">Voir</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">Aucun sponsor pour le moment.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

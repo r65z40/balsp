@@ -1,0 +1,17 @@
+body {
+  background-color: #f5f6f8;
+}
+
+.card {
+  border: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+#qr-reader {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.display-4 {
+  font-weight: 600;
+}
