@@ -30,19 +30,23 @@ open('$CERT_DIR/key.pem', 'wb').write(crypto.dump_privatekey(crypto.FILETYPE_PEM
 print('Certificat généré.')
 "
     fi
-    SSL_ARGS="--certfile=$CERT_DIR/cert.pem --keyfile=$CERT_DIR/key.pem"
     echo "Démarrage en HTTPS..."
-else
-    SSL_ARGS=""
-    echo "Démarrage en HTTP..."
-fi
+    exec python3 -c "
+import ssl
+from app import app
 
-# Lancer Gunicorn (production)
-exec gunicorn \
-    --bind 0.0.0.0:5000 \
-    --workers "${GUNICORN_WORKERS:-2}" \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile - \
-    $SSL_ARGS \
-    "app:app"
+ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ctx.load_cert_chain('$CERT_DIR/cert.pem', '$CERT_DIR/key.pem')
+
+app.run(host='0.0.0.0', port=5000, ssl_context=ctx, threaded=True)
+"
+else
+    echo "Démarrage en HTTP (Gunicorn)..."
+    exec gunicorn \
+        --bind 0.0.0.0:5000 \
+        --workers "${GUNICORN_WORKERS:-2}" \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile - \
+        "app:app"
+fi
