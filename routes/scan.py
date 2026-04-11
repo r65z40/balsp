@@ -93,6 +93,20 @@ def check_in():
     sponsor.entries_count += count
     log = ScanLog(sponsor_id=sponsor.id, count=count)
     db.session.add(log)
+
+    # Ajouter un invité nominatif si un nom est fourni
+    guest_name = (data.get("guest_name") or "").strip()
+    if guest_name:
+        from datetime import datetime
+
+        guest = Guest(
+            sponsor_id=sponsor.id,
+            name=guest_name,
+            checked_in=True,
+            checked_in_at=datetime.utcnow(),
+        )
+        db.session.add(guest)
+
     db.session.commit()
 
     return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})

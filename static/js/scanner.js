@@ -1,4 +1,4 @@
-// Scanner QR code pour l'accueil concert
+// Scanner QR code — Bal des Pompiers d'Auxerre
 
 (function () {
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
@@ -6,17 +6,16 @@
   let running = false;
   let currentToken = null;
 
+  // Sections
+  const scannerSection = document.getElementById('scanner-section');
+  const resultSection = document.getElementById('result-section');
+
+  // Scanner controls
   const btnToggle = document.getElementById('btn-toggle');
   const btnManual = document.getElementById('btn-manual');
-  const btnCheckin = document.getElementById('btn-checkin');
-  const btnUndo = document.getElementById('btn-undo');
-  const btnReset = document.getElementById('btn-reset');
-
   const manualInput = document.getElementById('manual-token');
-  const countInput = document.getElementById('checkin-count');
 
-  const resultCard = document.getElementById('result-card');
-  const placeholder = document.getElementById('placeholder');
+  // Result elements
   const resultLogo = document.getElementById('result-logo');
   const resultName = document.getElementById('result-name');
   const resultTier = document.getElementById('result-tier');
@@ -27,6 +26,15 @@
   const resultGuests = document.getElementById('result-guests');
   const guestList = document.getElementById('guest-list');
 
+  // Check-in controls
+  const guestNameInput = document.getElementById('guest-name');
+  const countInput = document.getElementById('checkin-count');
+  const btnCheckin = document.getElementById('btn-checkin');
+  const btnUndo = document.getElementById('btn-undo');
+  const btnRescan = document.getElementById('btn-rescan');
+
+  // --- UI helpers ---
+
   function showMessage(type, text) {
     resultMessage.className = `alert alert-${type}`;
     resultMessage.textContent = text;
@@ -36,6 +44,22 @@
     resultMessage.className = 'alert d-none';
     resultMessage.textContent = '';
   }
+
+  function showScannerView() {
+    scannerSection.classList.remove('d-none');
+    resultSection.classList.add('d-none');
+    currentToken = null;
+    guestNameInput.value = '';
+    countInput.value = '1';
+    clearMessage();
+  }
+
+  function showResultView() {
+    scannerSection.classList.add('d-none');
+    resultSection.classList.remove('d-none');
+  }
+
+  // --- Guests ---
 
   function renderGuests(guests) {
     guestList.innerHTML = '';
@@ -75,9 +99,9 @@
     showMessage('info', `${data.guest.name} ${action}.`);
   }
 
+  // --- Sponsor display ---
+
   function renderSponsor(sponsor) {
-    resultCard.classList.remove('d-none');
-    placeholder.classList.add('d-none');
     if (sponsor.logo_url) {
       resultLogo.src = sponsor.logo_url;
       resultLogo.style.display = '';
@@ -97,6 +121,8 @@
     renderGuests(sponsor.guests);
   }
 
+  // --- API ---
+
   async function apiPost(url, body) {
     const res = await fetch(url, {
       method: 'POST',
@@ -111,18 +137,23 @@
     return { ok: res.ok, status: res.status, data };
   }
 
+  // --- Actions ---
+
   async function verifyToken(token) {
     clearMessage();
     const { ok, data } = await apiPost('/scan/verify', { token });
     if (!ok || !data.ok) {
-      placeholder.classList.remove('d-none');
-      resultCard.classList.add('d-none');
       alert(data.error || 'QR code non reconnu.');
       currentToken = null;
       return;
     }
     currentToken = token;
+
+    // Arrêter la caméra et basculer vers le formulaire
+    await stopScanner();
+    showResultView();
     renderSponsor(data.sponsor);
+
     if (data.sponsor.is_full) {
       showMessage('warning', 'Toutes les invitations de ce sponsor ont déjà été utilisées.');
     }
@@ -131,9 +162,12 @@
   async function checkIn() {
     if (!currentToken) return;
     const count = parseInt(countInput.value, 10) || 1;
+    const guestName = (guestNameInput.value || '').trim();
+
     const { ok, data } = await apiPost('/scan/check-in', {
       token: currentToken,
       count,
+      guest_name: guestName,
     });
     if (!ok || !data.ok) {
       showMessage('danger', data.error || 'Erreur lors du pointage.');
@@ -141,7 +175,13 @@
       return;
     }
     renderSponsor(data.sponsor);
-    showMessage('success', `+${count} entrée(s) enregistrée(s).`);
+    let msg = `+${count} entrée(s) enregistrée(s).`;
+    if (guestName) msg += ` (${guestName})`;
+    showMessage('success', msg);
+
+    // Reset du formulaire pour le prochain invité
+    guestNameInput.value = '';
+    countInput.value = '1';
   }
 
   async function undo() {
@@ -155,13 +195,7 @@
     showMessage('info', 'Dernier pointage annulé.');
   }
 
-  function resetView() {
-    currentToken = null;
-    resultCard.classList.add('d-none');
-    placeholder.classList.remove('d-none');
-    resultGuests.classList.add('d-none');
-    manualInput.value = '';
-  }
+  // --- Camera ---
 
   async function startScanner() {
     if (!html5QrCode) {
@@ -194,6 +228,8 @@
     }
   }
 
+  // --- Event listeners ---
+
   btnToggle.addEventListener('click', () => {
     if (running) stopScanner();
     else startScanner();
@@ -203,6 +239,7 @@
     const token = (manualInput.value || '').trim();
     if (token) verifyToken(token);
   });
+
   manualInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -212,12 +249,10 @@
 
   btnCheckin.addEventListener('click', checkIn);
   btnUndo.addEventListener('click', undo);
-  btnReset.addEventListener('click', async () => {
-    resetView();
-    if (html5QrCode && running) {
-      try {
-        await html5QrCode.resume();
-      } catch (_) {}
-    }
+
+  btnRescan.addEventListener('click', async () => {
+    showScannerView();
+    // Relancer la caméra automatiquement
+    await startScanner();
   });
 })();
