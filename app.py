@@ -137,15 +137,76 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             else:
                 click.echo("Colonne 'role' déjà présente sur users.")
 
+        # Neutraliser les anciennes colonnes NOT NULL de sponsors
+        # (invitation_token, entries_count) sur un schéma pré-refactor.
+        # SQLAlchemy ne les connaît plus : tout INSERT échouerait sur la
+        # contrainte NOT NULL. On renomme l'ancienne table, on laisse
+        # db.create_all() recréer la nouvelle structure et on recopie
+        # les données (sauf les colonnes obsolètes) et les anciens
+        # tokens/entries pour la migration des invitations ci-dessous.
+        legacy_sponsor_rows: list[dict] = []
+        if "sponsors" in existing_tables:
+            sponsor_col_names = {
+                c["name"] for c in inspector.get_columns("sponsors")
+            }
+            legacy_cols = {"invitation_token", "entries_count"}
+            if legacy_cols & sponsor_col_names:
+                click.echo(
+                    "Nettoyage des colonnes obsolètes sur sponsors "
+                    "(invitation_token, entries_count)..."
+                )
+                keep_cols = [
+                    c for c in sponsor_col_names if c not in legacy_cols
+                ]
+                keep_list = ", ".join(keep_cols)
+
+                # Sauvegarde l'ensemble des colonnes (y compris les legacy)
+                # pour pouvoir migrer vers les Invitations après
+                legacy_sponsor_rows = [
+                    dict(r)
+                    for r in db.session.execute(
+                        text("SELECT * FROM sponsors")
+                    ).mappings().all()
+                ]
+
+                db.session.execute(
+                    text("ALTER TABLE sponsors RENAME TO sponsors_old")
+                )
+                db.session.commit()
+
+                # Recrée la table sponsors propre (sans les colonnes legacy)
+                db.create_all()
+
+                # Recopie les données utiles
+                if legacy_sponsor_rows:
+                    db.session.execute(
+                        text(
+                            f"INSERT INTO sponsors ({keep_list}) "
+                            f"SELECT {keep_list} FROM sponsors_old"
+                        )
+                    )
+                db.session.execute(text("DROP TABLE sponsors_old"))
+                db.session.commit()
+                click.echo("Colonnes obsolètes supprimées.")
+                # Met à jour l'inspector après DDL
+                inspector = inspect(db.engine)
+
         # Table invitations (1 QR code par personne)
-        existing_tables = inspect(db.engine).get_table_names()
-        if "invitations" not in existing_tables:
+        existing_tables_after = inspect(db.engine).get_table_names()
+        if "invitations" not in existing_tables_after:
             Invitation.__table__.create(db.engine)
             click.echo("Table 'invitations' créée.")
 
             # Migration des données de l'ancien schéma (1 sponsor = 1 QR)
             # vers le nouveau (N QR par sponsor).
-            if "sponsors" in existing_tables:
+            # On utilise legacy_sponsor_rows si la table sponsors a été
+            # nettoyée (colonnes obsolètes déjà retirées), sinon on lit
+            # directement depuis la table courante.
+            if legacy_sponsor_rows:
+                rows = legacy_sponsor_rows
+                has_old_token = True
+                has_old_entries = True
+            elif "sponsors" in existing_tables:
                 sponsor_cols = {c["name"] for c in inspector.get_columns("sponsors")}
                 has_old_token = "invitation_token" in sponsor_cols
                 has_old_entries = "entries_count" in sponsor_cols
@@ -156,10 +217,18 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 if has_old_entries:
                     select_fields.append("entries_count")
 
-                rows = db.session.execute(
-                    text(f"SELECT {', '.join(select_fields)} FROM sponsors")
-                ).mappings().all()
+                rows = [
+                    dict(r)
+                    for r in db.session.execute(
+                        text(f"SELECT {', '.join(select_fields)} FROM sponsors")
+                    ).mappings().all()
+                ]
+            else:
+                rows = []
+                has_old_token = False
+                has_old_entries = False
 
+            if rows:
                 # Récupérer les guests nommés de l'ancien schéma, si présents
                 old_guests: dict[int, list[dict]] = {}
                 if "guests" in existing_tables:
@@ -175,7 +244,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 created = 0
                 for row in rows:
                     sponsor_id = row["id"]
-                    total = int(row["total_invitations"] or 0)
+                    total = int(row.get("total_invitations") or 0)
                     old_token = row.get("invitation_token") if has_old_token else None
                     old_entries = int(row.get("entries_count") or 0) if has_old_entries else 0
                     guests = old_guests.get(sponsor_id, [])
