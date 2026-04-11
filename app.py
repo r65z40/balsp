@@ -121,6 +121,18 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             else:
                 click.echo("Colonne 'bonus_invitations' déjà présente.")
 
+        # Colonne guest_name sur scan_logs
+        if "scan_logs" in existing_tables:
+            cols = {c["name"] for c in inspector.get_columns("scan_logs")}
+            if "guest_name" not in cols:
+                db.session.execute(
+                    text("ALTER TABLE scan_logs ADD COLUMN guest_name VARCHAR(200)")
+                )
+                db.session.commit()
+                click.echo("Colonne 'guest_name' ajoutée à scan_logs.")
+            else:
+                click.echo("Colonne 'guest_name' déjà présente sur scan_logs.")
+
         # Colonne role sur users
         if "users" in existing_tables:
             cols = {c["name"] for c in inspector.get_columns("users")}

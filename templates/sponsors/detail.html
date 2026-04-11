@@ -101,9 +101,18 @@
       <div class="card-header">Historique des pointages</div>
       <ul class="list-group list-group-flush">
         {% for log in sponsor.scan_logs %}
-        <li class="list-group-item d-flex justify-content-between">
-          <span>{{ log.scanned_at.strftime('%d/%m/%Y %H:%M:%S') }}</span>
-          <span class="badge text-bg-primary">+{{ log.count }}</span>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            {{ log.scanned_at.strftime('%d/%m/%Y %H:%M:%S') }}
+            {% if log.guest_name %}
+              <span class="text-muted ms-2">— {{ log.guest_name }}</span>
+            {% endif %}
+          </span>
+          {% if log.count > 0 %}
+            <span class="badge text-bg-success">+{{ log.count }}</span>
+          {% else %}
+            <span class="badge text-bg-warning">{{ log.count }}</span>
+          {% endif %}
         </li>
         {% endfor %}
       </ul>

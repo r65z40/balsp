@@ -90,12 +90,13 @@ def check_in():
             409,
         )
 
-    sponsor.entries_count += count
-    log = ScanLog(sponsor_id=sponsor.id, count=count)
-    db.session.add(log)
-
     # Ajouter un invité nominatif si un nom est fourni
     guest_name = (data.get("guest_name") or "").strip()
+
+    sponsor.entries_count += count
+    log = ScanLog(sponsor_id=sponsor.id, count=count, guest_name=guest_name or None)
+    db.session.add(log)
+
     if guest_name:
         from datetime import datetime
 
@@ -155,13 +156,31 @@ def guest_toggle():
 
     from datetime import datetime
 
+    sponsor = guest.sponsor
     guest.checked_in = not guest.checked_in
     guest.checked_in_at = datetime.utcnow() if guest.checked_in else None
+
+    if guest.checked_in:
+        # Pointer : +1 entrée
+        if sponsor.entries_count >= sponsor.total_invitations:
+            return jsonify({
+                "ok": False,
+                "error": f"Quota atteint : {sponsor.entries_count}/{sponsor.total_invitations}.",
+                "sponsor": _sponsor_payload(sponsor),
+            }), 409
+        sponsor.entries_count += 1
+        log = ScanLog(sponsor_id=sponsor.id, count=1, guest_name=guest.name)
+        db.session.add(log)
+    else:
+        # Dépointer : -1 entrée
+        sponsor.entries_count = max(0, sponsor.entries_count - 1)
+        log = ScanLog(sponsor_id=sponsor.id, count=-1, guest_name=guest.name)
+        db.session.add(log)
+
     action = "pointé" if guest.checked_in else "dépointé"
-    log_action("toggle_guest", f"Invité « {guest.name} » {action} (sponsor « {guest.sponsor.company_name} »).", "sponsor", guest.sponsor_id)
+    log_action("toggle_guest", f"Invité « {guest.name} » {action} (sponsor « {sponsor.company_name} »).", "sponsor", guest.sponsor_id)
     db.session.commit()
 
-    sponsor = guest.sponsor
     return jsonify({
         "ok": True,
         "guest": {"id": guest.id, "name": guest.name, "checked_in": guest.checked_in},

@@ -105,6 +105,7 @@ class ScanLog(db.Model):
         db.Integer, db.ForeignKey("sponsors.id", ondelete="CASCADE"), nullable=False
     )
     count = db.Column(db.Integer, nullable=False, default=1)
+    guest_name = db.Column(db.String(200), nullable=True)
     scanned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
