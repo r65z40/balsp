@@ -1,12 +1,14 @@
-"""Configuration SMTP + personnalisation du modèle d'email."""
+"""Configuration SMTP + personnalisation du modèle d'email + branding."""
 from __future__ import annotations
 
-from flask import Blueprint, current_app, flash, redirect, render_template, url_for
+import os
+
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from extensions import admin_required, db, log_action
-from forms import EmailTemplateForm, SmtpConfigForm
-from models import EmailTemplate, SmtpConfig, Sponsor, Tier
+from forms import BrandingForm, EmailTemplateForm, SmtpConfigForm
+from models import EmailTemplate, Invitation, SmtpConfig, Sponsor, Tier
 from utils.crypto import encrypt
 from utils.defaults import DEFAULT_EMAIL_BODY, DEFAULT_EMAIL_SUBJECT
 from utils.mailer import (
@@ -73,7 +75,7 @@ def smtp():
 
 
 def _sample_sponsor() -> Sponsor:
-    """Sponsor factice pour l'aperçu."""
+    """Sponsor factice (avec invitations) pour l'aperçu."""
     s = Sponsor(
         company_name="Entreprise Exemple",
         contact_name="Jean Dupont",
@@ -83,6 +85,11 @@ def _sample_sponsor() -> Sponsor:
         amount=750,
         total_invitations=3,
     )
+    s.invitations = [
+        Invitation(number=1, token="sample-token-1", guest_name="Jean Dupont"),
+        Invitation(number=2, token="sample-token-2", guest_name=None),
+        Invitation(number=3, token="sample-token-3", guest_name=None),
+    ]
     return s
 
 
@@ -109,15 +116,31 @@ def email_template():
             return redirect(url_for("settings.email_template"))
 
         if form.preview.data:
+            from utils.qr import generate_qr_data_url
+
             sample = _sample_sponsor()
-            context = build_context(sample, qr_cid="preview")
-            # Pour l'aperçu on remplace le cid par une image placeholder
-            context["qr_cid"] = (
-                "https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg"
-            )
+            logo_path = str(current_app.config.get("BAL_LOGO_PATH", ""))
+            if not os.path.exists(logo_path):
+                logo_path = None
+            total = len(sample.invitations)
+            qr_imgs = []
+            for inv in sample.invitations:
+                data_url = generate_qr_data_url(
+                    inv.token, number=inv.number, total=total, logo_path=logo_path
+                )
+                name_block = (
+                    f'<div style="color:#555;font-size:14px;">Au nom de <strong>{inv.guest_name}</strong></div>'
+                    if inv.guest_name else ""
+                )
+                qr_imgs.append(
+                    f'<div style="display:inline-block;margin:12px;text-align:center;vertical-align:top;">'
+                    f'<img src="{data_url}" style="max-width:240px;" alt="QR {inv.number}">'
+                    f'{name_block}</div>'
+                )
+            qr_html = '<div style="text-align:center;margin:25px 0;">' + "".join(qr_imgs) + "</div>"
+            context = build_context(sample, qr_codes_html=qr_html)
             preview_html = render_email_template(form.body_html.data, context)
             flash("Aperçu généré avec un sponsor fictif.", "info")
-            # On ne sauvegarde pas, on réaffiche juste
             return render_template(
                 "settings/email_template.html",
                 form=form,
@@ -143,7 +166,7 @@ def email_template():
                     smtp_settings,
                     temp_tpl,
                     sample,
-                    qr_payload="SPONSOR-TEST-TOKEN",
+                    invitations=sample.invitations,
                     recipient_override=form.test_recipient.data,
                 )
                 flash(
@@ -166,4 +189,70 @@ def email_template():
 
     return render_template(
         "settings/email_template.html", form=form, preview_html=preview_html
+    )
+
+
+@bp.route("/branding", methods=["GET", "POST"])
+@login_required
+@admin_required
+def branding():
+    """Upload du logo du bal (placé au centre de chaque QR code)."""
+    logo_path = str(current_app.config["BAL_LOGO_PATH"])
+    logo_exists = os.path.exists(logo_path)
+    form = BrandingForm()
+
+    if form.validate_on_submit():
+        if form.remove.data:
+            if logo_exists:
+                try:
+                    os.remove(logo_path)
+                    log_action("remove_bal_logo", "Logo du bal supprimé.")
+                    db.session.commit()
+                    flash("Logo supprimé.", "success")
+                except OSError as exc:
+                    flash(f"Impossible de supprimer le logo : {exc}", "danger")
+            else:
+                flash("Aucun logo à supprimer.", "info")
+            return redirect(url_for("settings.branding"))
+
+        if not form.logo.data:
+            flash("Veuillez sélectionner un fichier.", "warning")
+            return redirect(url_for("settings.branding"))
+
+        # Conversion en PNG et enregistrement
+        try:
+            from PIL import Image
+
+            os.makedirs(os.path.dirname(logo_path), exist_ok=True)
+            img = Image.open(form.logo.data).convert("RGBA")
+            # Redimensionner si trop grand (max 600x600)
+            img.thumbnail((600, 600), Image.LANCZOS)
+            img.save(logo_path, format="PNG")
+            log_action("set_bal_logo", "Logo du bal mis à jour.")
+            db.session.commit()
+            flash("Logo du bal enregistré.", "success")
+        except Exception as exc:  # noqa: BLE001
+            current_app.logger.exception("Upload du logo du bal échoué")
+            flash(f"Impossible d'enregistrer le logo : {exc}", "danger")
+        return redirect(url_for("settings.branding"))
+
+    # Aperçu : un QR de démonstration avec le logo actuel
+    preview_data_url = None
+    try:
+        from utils.qr import generate_qr_data_url
+
+        preview_data_url = generate_qr_data_url(
+            "demo-preview-token",
+            number=1,
+            total=3,
+            logo_path=logo_path if logo_exists else None,
+        )
+    except Exception:
+        current_app.logger.exception("Aperçu logo échoué")
+
+    return render_template(
+        "settings/branding.html",
+        form=form,
+        logo_exists=logo_exists,
+        preview_data_url=preview_data_url,
     )

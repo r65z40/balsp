@@ -91,6 +91,21 @@ class SponsorForm(FlaskForm):
         return ok
 
 
+class BrandingForm(FlaskForm):
+    logo = FileField(
+        "Logo du bal (centre des QR codes)",
+        validators=[
+            Optional(),
+            FileAllowed(
+                ["png", "jpg", "jpeg"],
+                "Formats acceptés : PNG, JPG.",
+            ),
+        ],
+    )
+    submit = SubmitField("Enregistrer le logo")
+    remove = SubmitField("Supprimer le logo")
+
+
 class UserForm(FlaskForm):
     username = StringField("Nom d'utilisateur", validators=[DataRequired(), Length(min=3, max=80)])
     password = PasswordField("Mot de passe", validators=[Optional(), Length(min=4)])

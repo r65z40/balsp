@@ -1,11 +1,18 @@
-"""Page scanner + endpoints JSON pour le pointage à l'accueil."""
+"""Page scanner + endpoints JSON pour le pointage à l'accueil.
+
+Flux nouvelle génération : chaque QR code correspond à UNE invitation
+spécifique (un QR par personne), pas au sponsor entier. Le scan marque
+l'invitation comme utilisée et refuse si elle l'est déjà.
+"""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, render_template, request, url_for
-from flask_login import login_required
+from datetime import datetime
 
-from extensions import csrf, db, log_action
-from models import Guest, ScanLog, Sponsor
+from flask import Blueprint, jsonify, render_template, request, url_for
+from flask_login import current_user, login_required
+
+from extensions import db, log_action
+from models import Invitation, Sponsor
 
 bp = Blueprint("scan", __name__, url_prefix="/scan")
 
@@ -16,18 +23,22 @@ def page():
     return render_template("scan.html")
 
 
-def _sponsor_payload(sponsor: Sponsor) -> dict:
+def _invitation_dict(inv: Invitation) -> dict:
+    return {
+        "id": inv.id,
+        "number": inv.number,
+        "guest_name": inv.guest_name,
+        "scanned": inv.scanned_at is not None,
+        "scanned_at": inv.scanned_at.strftime("%d/%m/%Y %H:%M:%S") if inv.scanned_at else None,
+        "scanned_by": inv.scanned_by.username if inv.scanned_by else None,
+    }
+
+
+def _sponsor_payload(sponsor: Sponsor, current_invitation_id: int | None = None) -> dict:
     logo_url = None
     if sponsor.logo_filename:
         logo_url = url_for("static", filename=f"uploads/logos/{sponsor.logo_filename}")
-    guests = [
-        {
-            "id": g.id,
-            "name": g.name,
-            "checked_in": g.checked_in,
-        }
-        for g in sponsor.guests
-    ]
+    invitations = [_invitation_dict(inv) for inv in sponsor.invitations]
     return {
         "id": sponsor.id,
         "company_name": sponsor.company_name,
@@ -39,150 +50,146 @@ def _sponsor_payload(sponsor: Sponsor) -> dict:
         "remaining": sponsor.remaining_invitations,
         "is_full": sponsor.is_full,
         "logo_url": logo_url,
-        "guests": guests,
+        "invitations": invitations,
+        "current_invitation_id": current_invitation_id,
     }
+
+
+def _find_invitation(token: str) -> Invitation | None:
+    return Invitation.query.filter_by(token=token).first()
 
 
 @bp.route("/verify", methods=["POST"])
 @login_required
 def verify():
+    """Vérifie un token d'invitation et renvoie le sponsor + l'invitation."""
     data = request.get_json(silent=True) or {}
     token = (data.get("token") or "").strip()
     if not token:
         return jsonify({"ok": False, "error": "Token manquant."}), 400
 
-    sponsor = Sponsor.query.filter_by(invitation_token=token).first()
-    if not sponsor:
+    invitation = _find_invitation(token)
+    if not invitation:
         return jsonify({"ok": False, "error": "QR code inconnu."}), 404
 
-    return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})
+    return jsonify({
+        "ok": True,
+        "invitation": _invitation_dict(invitation),
+        "sponsor": _sponsor_payload(invitation.sponsor, current_invitation_id=invitation.id),
+    })
 
 
 @bp.route("/check-in", methods=["POST"])
 @login_required
 def check_in():
+    """Marque une invitation comme utilisée (par son token)."""
     data = request.get_json(silent=True) or {}
     token = (data.get("token") or "").strip()
-    try:
-        count = int(data.get("count", 1))
-    except (TypeError, ValueError):
-        return jsonify({"ok": False, "error": "Nombre invalide."}), 400
-
-    if count <= 0:
-        return jsonify({"ok": False, "error": "Nombre doit être positif."}), 400
-
-    sponsor = Sponsor.query.filter_by(invitation_token=token).first()
-    if not sponsor:
-        return jsonify({"ok": False, "error": "QR code inconnu."}), 404
-
-    if sponsor.entries_count + count > sponsor.total_invitations:
-        return (
-            jsonify(
-                {
-                    "ok": False,
-                    "error": (
-                        f"Quota dépassé : {sponsor.entries_count}/"
-                        f"{sponsor.total_invitations} déjà utilisées."
-                    ),
-                    "sponsor": _sponsor_payload(sponsor),
-                }
-            ),
-            409,
-        )
-
-    # Ajouter un invité nominatif si un nom est fourni
     guest_name = (data.get("guest_name") or "").strip()
 
-    sponsor.entries_count += count
-    log = ScanLog(sponsor_id=sponsor.id, count=count, guest_name=guest_name or None)
-    db.session.add(log)
+    invitation = _find_invitation(token)
+    if not invitation:
+        return jsonify({"ok": False, "error": "QR code inconnu."}), 404
 
-    if guest_name:
-        from datetime import datetime
+    if invitation.scanned_at is not None:
+        return jsonify({
+            "ok": False,
+            "error": (
+                f"Invitation n°{invitation.number} déjà utilisée le "
+                f"{invitation.scanned_at.strftime('%d/%m/%Y à %H:%M')}"
+                + (f" ({invitation.scanned_by.username})" if invitation.scanned_by else "")
+                + "."
+            ),
+            "invitation": _invitation_dict(invitation),
+            "sponsor": _sponsor_payload(invitation.sponsor, current_invitation_id=invitation.id),
+        }), 409
 
-        guest = Guest(
-            sponsor_id=sponsor.id,
-            name=guest_name,
-            checked_in=True,
-            checked_in_at=datetime.utcnow(),
-        )
-        db.session.add(guest)
+    if guest_name and not invitation.guest_name:
+        invitation.guest_name = guest_name
+    invitation.scanned_at = datetime.utcnow()
+    invitation.scanned_by_user_id = current_user.id
 
-    desc = f"Check-in +{count} pour « {sponsor.company_name} »."
-    if guest_name:
-        desc += f" Invité : {guest_name}."
-    log_action("check_in", desc, "sponsor", sponsor.id)
+    desc = f"Invitation n°{invitation.number} pointée — sponsor « {invitation.sponsor.company_name} »"
+    if invitation.guest_name:
+        desc += f" — {invitation.guest_name}"
+    log_action("check_in", desc + ".", "sponsor", invitation.sponsor_id)
     db.session.commit()
 
-    return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})
+    return jsonify({
+        "ok": True,
+        "invitation": _invitation_dict(invitation),
+        "sponsor": _sponsor_payload(invitation.sponsor, current_invitation_id=invitation.id),
+    })
 
 
 @bp.route("/undo", methods=["POST"])
 @login_required
 def undo():
+    """Annule le pointage d'une invitation donnée (par token)."""
     data = request.get_json(silent=True) or {}
     token = (data.get("token") or "").strip()
-    sponsor = Sponsor.query.filter_by(invitation_token=token).first()
-    if not sponsor:
+
+    invitation = _find_invitation(token)
+    if not invitation:
         return jsonify({"ok": False, "error": "QR code inconnu."}), 404
 
-    last_log = (
-        ScanLog.query.filter_by(sponsor_id=sponsor.id)
-        .order_by(ScanLog.scanned_at.desc())
-        .first()
+    if invitation.scanned_at is None:
+        return jsonify({"ok": False, "error": "Cette invitation n'a pas encore été pointée."}), 400
+
+    invitation.scanned_at = None
+    invitation.scanned_by_user_id = None
+    log_action(
+        "undo_check_in",
+        f"Annulation du pointage n°{invitation.number} — sponsor « {invitation.sponsor.company_name} ».",
+        "sponsor",
+        invitation.sponsor_id,
     )
-    if not last_log:
-        return jsonify({"ok": False, "error": "Aucun pointage à annuler."}), 400
-
-    sponsor.entries_count = max(0, sponsor.entries_count - last_log.count)
-    log_action("undo_check_in", f"Annulation de {last_log.count} entrée(s) pour « {sponsor.company_name} ».", "sponsor", sponsor.id)
-    db.session.delete(last_log)
-    db.session.commit()
-    return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})
-
-
-@bp.route("/guest-toggle", methods=["POST"])
-@login_required
-def guest_toggle():
-    """Bascule le statut checked_in d'un invité nommé."""
-    data = request.get_json(silent=True) or {}
-    guest_id = data.get("guest_id")
-    if not guest_id:
-        return jsonify({"ok": False, "error": "ID invité manquant."}), 400
-
-    guest = db.session.get(Guest, guest_id)
-    if not guest:
-        return jsonify({"ok": False, "error": "Invité inconnu."}), 404
-
-    from datetime import datetime
-
-    sponsor = guest.sponsor
-    guest.checked_in = not guest.checked_in
-    guest.checked_in_at = datetime.utcnow() if guest.checked_in else None
-
-    if guest.checked_in:
-        # Pointer : +1 entrée
-        if sponsor.entries_count >= sponsor.total_invitations:
-            return jsonify({
-                "ok": False,
-                "error": f"Quota atteint : {sponsor.entries_count}/{sponsor.total_invitations}.",
-                "sponsor": _sponsor_payload(sponsor),
-            }), 409
-        sponsor.entries_count += 1
-        log = ScanLog(sponsor_id=sponsor.id, count=1, guest_name=guest.name)
-        db.session.add(log)
-    else:
-        # Dépointer : -1 entrée
-        sponsor.entries_count = max(0, sponsor.entries_count - 1)
-        log = ScanLog(sponsor_id=sponsor.id, count=-1, guest_name=guest.name)
-        db.session.add(log)
-
-    action = "pointé" if guest.checked_in else "dépointé"
-    log_action("toggle_guest", f"Invité « {guest.name} » {action} (sponsor « {sponsor.company_name} »).", "sponsor", guest.sponsor_id)
     db.session.commit()
 
     return jsonify({
         "ok": True,
-        "guest": {"id": guest.id, "name": guest.name, "checked_in": guest.checked_in},
-        "sponsor": _sponsor_payload(sponsor),
+        "invitation": _invitation_dict(invitation),
+        "sponsor": _sponsor_payload(invitation.sponsor, current_invitation_id=invitation.id),
+    })
+
+
+@bp.route("/toggle-invitation", methods=["POST"])
+@login_required
+def toggle_invitation():
+    """Toggle manuel d'une invitation depuis la liste (par id).
+
+    Sert au personnel pour corriger : pointer/dépointer une invitation
+    sans avoir à re-scanner le QR, directement depuis la liste affichée
+    après le scan d'un autre QR du même sponsor.
+    """
+    data = request.get_json(silent=True) or {}
+    invitation_id = data.get("invitation_id")
+    if not invitation_id:
+        return jsonify({"ok": False, "error": "ID manquant."}), 400
+
+    invitation = db.session.get(Invitation, invitation_id)
+    if not invitation:
+        return jsonify({"ok": False, "error": "Invitation inconnue."}), 404
+
+    if invitation.scanned_at is None:
+        invitation.scanned_at = datetime.utcnow()
+        invitation.scanned_by_user_id = current_user.id
+        action_desc = "pointée"
+    else:
+        invitation.scanned_at = None
+        invitation.scanned_by_user_id = None
+        action_desc = "dépointée"
+
+    log_action(
+        "toggle_invitation",
+        f"Invitation n°{invitation.number} {action_desc} — sponsor « {invitation.sponsor.company_name} ».",
+        "sponsor",
+        invitation.sponsor_id,
+    )
+    db.session.commit()
+
+    return jsonify({
+        "ok": True,
+        "invitation": _invitation_dict(invitation),
+        "sponsor": _sponsor_payload(invitation.sponsor, current_invitation_id=invitation.id),
     })

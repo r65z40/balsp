@@ -15,10 +15,13 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{BASE_DIR / 'instance' / 'balsp.db'}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Upload logos
+    # Upload logos sponsors
     UPLOAD_FOLDER = BASE_DIR / "static" / "uploads" / "logos"
-    MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # 2 Mo
+    MAX_CONTENT_LENGTH = 4 * 1024 * 1024  # 4 Mo
     ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+
+    # Logo du bal (affiché au centre des QR codes)
+    BAL_LOGO_PATH = BASE_DIR / "instance" / "bal_logo.png"
 
     # Admin initial
     ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")

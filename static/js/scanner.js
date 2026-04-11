@@ -1,4 +1,5 @@
 // Scanner QR code — Bal des Pompiers d'Auxerre
+// Chaque QR code correspond à une invitation unique.
 
 (function () {
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
@@ -23,12 +24,14 @@
   const resultTotal = document.getElementById('result-total');
   const resultProgress = document.getElementById('result-progress');
   const resultMessage = document.getElementById('result-message');
-  const resultGuests = document.getElementById('result-guests');
-  const guestList = document.getElementById('guest-list');
+  const currentCard = document.getElementById('current-invitation');
+  const currentNumber = document.getElementById('current-number');
+  const currentName = document.getElementById('current-name');
+  const currentStatus = document.getElementById('current-status');
+  const invitationList = document.getElementById('invitation-list');
 
   // Check-in controls
   const guestNameInput = document.getElementById('guest-name');
-  const countInput = document.getElementById('checkin-count');
   const btnCheckin = document.getElementById('btn-checkin');
   const btnUndo = document.getElementById('btn-undo');
   const btnRescan = document.getElementById('btn-rescan');
@@ -49,8 +52,7 @@
     scannerSection.classList.remove('d-none');
     resultSection.classList.add('d-none');
     currentToken = null;
-    guestNameInput.value = '';
-    countInput.value = '1';
+    if (guestNameInput) guestNameInput.value = '';
     clearMessage();
   }
 
@@ -59,47 +61,56 @@
     resultSection.classList.remove('d-none');
   }
 
-  // --- Guests ---
+  // --- Rendering ---
 
-  function renderGuests(guests) {
-    guestList.innerHTML = '';
-    if (!guests || guests.length === 0) {
-      resultGuests.classList.add('d-none');
-      return;
-    }
-    resultGuests.classList.remove('d-none');
-    guests.forEach(g => {
+  function renderInvitations(invitations, currentId) {
+    invitationList.innerHTML = '';
+    invitations.forEach(inv => {
       const li = document.createElement('li');
-      li.className = 'list-group-item d-flex justify-content-between align-items-center';
-      const badge = g.checked_in
+      const isCurrent = inv.id === currentId;
+      li.className = 'list-group-item d-flex justify-content-between align-items-center'
+        + (isCurrent ? ' border-danger border-2' : '');
+      const badge = inv.scanned
         ? '<span class="badge text-bg-success me-2">Arrivé</span>'
-        : '<span class="badge text-bg-light me-2">Attendu</span>';
+        : '<span class="badge text-bg-light text-dark me-2">Attendu</span>';
+      const nameHtml = inv.guest_name
+        ? `<strong>${inv.guest_name}</strong>`
+        : '<span class="text-muted">Sans nom</span>';
+      const scannedBy = inv.scanned_by ? ` <small class="text-muted">par ${inv.scanned_by}</small>` : '';
       li.innerHTML = `
-        <span>${badge}${g.name}</span>
-        <button class="btn btn-sm ${g.checked_in ? 'btn-outline-secondary' : 'btn-outline-success'} guest-toggle" data-id="${g.id}">
-          ${g.checked_in ? 'Annuler' : 'Pointer'}
+        <span>${badge}<span class="me-2">#${inv.number}</span>${nameHtml}${scannedBy}</span>
+        <button class="btn btn-sm ${inv.scanned ? 'btn-outline-secondary' : 'btn-outline-success'} inv-toggle" data-id="${inv.id}">
+          ${inv.scanned ? 'Annuler' : 'Pointer'}
         </button>
       `;
-      guestList.appendChild(li);
+      invitationList.appendChild(li);
     });
 
-    guestList.querySelectorAll('.guest-toggle').forEach(btn => {
-      btn.addEventListener('click', () => toggleGuest(parseInt(btn.dataset.id)));
+    invitationList.querySelectorAll('.inv-toggle').forEach(btn => {
+      btn.addEventListener('click', () => toggleInvitation(parseInt(btn.dataset.id)));
     });
   }
 
-  async function toggleGuest(guestId) {
-    const { ok, data } = await apiPost('/scan/guest-toggle', { guest_id: guestId });
-    if (!ok || !data.ok) {
-      showMessage('danger', data.error || 'Erreur.');
+  function renderCurrentInvitation(inv) {
+    if (!inv) {
+      currentCard.classList.add('d-none');
       return;
     }
-    renderSponsor(data.sponsor);
-    const action = data.guest.checked_in ? 'pointé' : 'dépointé';
-    showMessage('info', `${data.guest.name} ${action}.`);
+    currentCard.classList.remove('d-none');
+    currentNumber.textContent = inv.number;
+    currentName.textContent = inv.guest_name || '';
+    if (inv.scanned) {
+      currentStatus.className = 'badge text-bg-success';
+      currentStatus.textContent = 'Déjà pointée';
+      btnCheckin.disabled = true;
+      btnUndo.classList.remove('d-none');
+    } else {
+      currentStatus.className = 'badge text-bg-warning text-dark';
+      currentStatus.textContent = 'En attente';
+      btnCheckin.disabled = false;
+      btnUndo.classList.add('d-none');
+    }
   }
-
-  // --- Sponsor display ---
 
   function renderSponsor(sponsor) {
     if (sponsor.logo_url) {
@@ -118,7 +129,7 @@
     resultProgress.style.width = pct + '%';
     resultProgress.classList.toggle('bg-success', sponsor.is_full);
     resultProgress.classList.toggle('bg-warning', !sponsor.is_full && pct >= 50);
-    renderGuests(sponsor.guests);
+    renderInvitations(sponsor.invitations, sponsor.current_invitation_id);
   }
 
   // --- API ---
@@ -149,39 +160,39 @@
     }
     currentToken = token;
 
-    // Arrêter la caméra et basculer vers le formulaire
     await stopScanner();
     showResultView();
     renderSponsor(data.sponsor);
+    renderCurrentInvitation(data.invitation);
 
-    if (data.sponsor.is_full) {
-      showMessage('warning', 'Toutes les invitations de ce sponsor ont déjà été utilisées.');
+    if (data.invitation.scanned) {
+      showMessage('warning', `⚠️ Invitation n°${data.invitation.number} déjà utilisée.`);
+    } else {
+      showMessage('info', `Invitation n°${data.invitation.number} — prête à être pointée.`);
     }
   }
 
   async function checkIn() {
     if (!currentToken) return;
-    const count = parseInt(countInput.value, 10) || 1;
     const guestName = (guestNameInput.value || '').trim();
 
     const { ok, data } = await apiPost('/scan/check-in', {
       token: currentToken,
-      count,
       guest_name: guestName,
     });
     if (!ok || !data.ok) {
       showMessage('danger', data.error || 'Erreur lors du pointage.');
-      if (data.sponsor) renderSponsor(data.sponsor);
+      if (data.sponsor) {
+        renderSponsor(data.sponsor);
+        renderCurrentInvitation(data.invitation);
+      }
       return;
     }
     renderSponsor(data.sponsor);
-    let msg = `+${count} entrée(s) enregistrée(s).`;
-    if (guestName) msg += ` (${guestName})`;
-    showMessage('success', msg);
-
-    // Reset du formulaire pour le prochain invité
+    renderCurrentInvitation(data.invitation);
+    const name = data.invitation.guest_name ? ` (${data.invitation.guest_name})` : '';
+    showMessage('success', `✓ Invitation n°${data.invitation.number} pointée${name}.`);
     guestNameInput.value = '';
-    countInput.value = '1';
   }
 
   async function undo() {
@@ -192,7 +203,22 @@
       return;
     }
     renderSponsor(data.sponsor);
-    showMessage('info', 'Dernier pointage annulé.');
+    renderCurrentInvitation(data.invitation);
+    showMessage('info', `Pointage de l'invitation n°${data.invitation.number} annulé.`);
+  }
+
+  async function toggleInvitation(invitationId) {
+    const { ok, data } = await apiPost('/scan/toggle-invitation', { invitation_id: invitationId });
+    if (!ok || !data.ok) {
+      showMessage('danger', data.error || 'Erreur.');
+      return;
+    }
+    renderSponsor(data.sponsor);
+    if (data.invitation.id === data.sponsor.current_invitation_id) {
+      renderCurrentInvitation(data.invitation);
+    }
+    const action = data.invitation.scanned ? 'pointée' : 'dépointée';
+    showMessage('info', `Invitation n°${data.invitation.number} ${action}.`);
   }
 
   // --- Camera ---
@@ -252,7 +278,6 @@
 
   btnRescan.addEventListener('click', async () => {
     showScannerView();
-    // Relancer la caméra automatiquement
     await startScanner();
   });
 })();

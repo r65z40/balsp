@@ -26,11 +26,12 @@
   </div>
 </div>
 
-<!-- SECTION RÉSULTAT (formulaire check-in, caméra cachée) -->
+<!-- SECTION RÉSULTAT -->
 <div id="result-section" class="d-none">
   <div class="row justify-content-center">
     <div class="col-lg-8">
 
+      <!-- Info sponsor + compteur global -->
       <div class="card mb-4">
         <div class="card-body text-center">
           <img id="result-logo" alt="" class="mb-3" style="max-height:80px; display:none;">
@@ -40,7 +41,7 @@
           <div class="display-4">
             <span id="result-entries">0</span> / <span id="result-total">0</span>
           </div>
-          <div class="text-muted small mb-2">entrées enregistrées</div>
+          <div class="text-muted small mb-2">personnes arrivées</div>
 
           <div class="progress my-3" style="height: 12px;">
             <div id="result-progress" class="progress-bar" style="width: 0%"></div>
@@ -50,35 +51,33 @@
         </div>
       </div>
 
-      <!-- Invités nominatifs existants -->
-      <div id="result-guests" class="card mb-4 d-none">
-        <div class="card-header"><strong>Invités nominatifs</strong></div>
-        <ul id="guest-list" class="list-group list-group-flush"></ul>
-      </div>
-
-      <!-- Formulaire de check-in -->
-      <div class="card mb-4">
-        <div class="card-header"><strong>Enregistrer une entrée</strong></div>
+      <!-- Invitation scannée : action principale -->
+      <div id="current-invitation" class="card mb-4 d-none">
+        <div class="card-header">
+          <strong>Invitation n°<span id="current-number">—</span></strong>
+          <span id="current-status" class="badge ms-2">—</span>
+        </div>
         <div class="card-body">
           <div class="mb-3">
-            <label for="guest-name" class="form-label">Nom de l'invité <span class="text-muted">(facultatif)</span></label>
+            <label class="form-label">Nom de l'invité <span class="text-muted">(facultatif)</span></label>
             <input type="text" id="guest-name" class="form-control" placeholder="Ex: Jean Dupont">
+            <div class="form-text">Si l'invitation est déjà nommée : <strong><span id="current-name"></span></strong>. Laisser vide pour conserver.</div>
           </div>
-          <div class="row align-items-end">
-            <div class="col-auto">
-              <label for="checkin-count" class="form-label">Nombre</label>
-              <input type="number" id="checkin-count" class="form-control" value="1" min="1" style="width: 80px;">
-            </div>
-            <div class="col">
-              <button id="btn-checkin" class="btn btn-success btn-lg w-100">+ Enregistrer l'entrée</button>
-            </div>
+          <div class="d-flex gap-2">
+            <button id="btn-checkin" class="btn btn-success btn-lg flex-grow-1">
+              &#x2713; Pointer cette invitation
+            </button>
+            <button id="btn-undo" class="btn btn-outline-warning d-none">
+              Annuler
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Annuler -->
-      <div class="d-flex justify-content-between mb-4">
-        <button id="btn-undo" class="btn btn-outline-warning">Annuler le dernier pointage</button>
+      <!-- Liste des invitations du sponsor -->
+      <div class="card mb-4">
+        <div class="card-header"><strong>Toutes les invitations de ce sponsor</strong></div>
+        <ul id="invitation-list" class="list-group list-group-flush"></ul>
       </div>
 
       <!-- Bouton rescanner -->

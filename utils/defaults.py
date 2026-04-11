@@ -1,12 +1,12 @@
 """Valeurs par défaut (modèle d'email, etc.)."""
 
-DEFAULT_EMAIL_SUBJECT = "Votre invitation pour le Bal des Pompiers d'Auxerre"
+DEFAULT_EMAIL_SUBJECT = "Vos invitations pour le Bal des Pompiers d'Auxerre"
 
 DEFAULT_EMAIL_BODY = """\
 <!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="UTF-8"></head>
-<body style="font-family: Arial, sans-serif; color: #222; max-width: 600px; margin: 0 auto;">
+<body style="font-family: Arial, sans-serif; color: #222; max-width: 640px; margin: 0 auto;">
   <div style="background: linear-gradient(135deg, #8b0000 0%, #c8102e 100%); padding: 25px; text-align: center; border-radius: 8px 8px 0 0;">
     <h1 style="color: #fff; margin: 0; font-size: 24px;">&#x1F6A8; Bal des Sapeurs-Pompiers</h1>
     <p style="color: #f0a500; margin: 5px 0 0; font-size: 16px;">Auxerre</p>
@@ -28,12 +28,12 @@ DEFAULT_EMAIL_BODY = """\
     </p>
 
     <p>
-      Merci de présenter ce QR code à l'accueil le soir de l'événement :
+      Vous trouverez ci-dessous <strong>un QR code par personne</strong>.
+      Chaque QR code est valable pour une seule entrée et doit être présenté
+      à l'accueil le soir de l'événement (sur téléphone ou imprimé).
     </p>
 
-    <p style="text-align: center; margin: 30px 0;">
-      <img src="${qr_cid}" alt="QR code invitation" style="max-width: 260px;">
-    </p>
+    ${qr_codes}
 
     <p>
       En cas de question, n'hésitez pas à répondre directement à cet email.

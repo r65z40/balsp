@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Logo du bal — Bal des Pompiers{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <h1 class="h3 mb-4">Logo du bal</h1>
+
+    <div class="alert alert-info">
+      Ce logo sera placé au <strong>centre de chaque QR code</strong> généré pour les
+      invitations. Utilisez une image carrée, lisible à petite taille (PNG transparent
+      recommandé). Format max : 4 Mo.
+    </div>
+
+    <div class="row">
+      <div class="col-md-7">
+        <form method="post" enctype="multipart/form-data" class="card">
+          <div class="card-body">
+            {{ form.hidden_tag() }}
+
+            <div class="mb-3">
+              {{ form.logo.label(class="form-label") }}
+              {{ form.logo(class="form-control") }}
+              {% for err in form.logo.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+            </div>
+
+            <div class="d-flex gap-2">
+              {{ form.submit(class="btn btn-pompier") }}
+              {% if logo_exists %}
+              {{ form.remove(class="btn btn-outline-danger", onclick="return confirm('Supprimer le logo actuel ?');") }}
+              {% endif %}
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="col-md-5">
+        <div class="card">
+          <div class="card-header">Aperçu d'un QR code</div>
+          <div class="card-body text-center">
+            {% if preview_data_url %}
+              <img src="{{ preview_data_url }}" alt="Aperçu" class="img-fluid" style="max-width: 260px;">
+              {% if not logo_exists %}
+              <p class="text-muted small mt-2">Aucun logo enregistré — QR sans image centrale.</p>
+              {% endif %}
+            {% else %}
+              <p class="text-muted">Aperçu indisponible.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

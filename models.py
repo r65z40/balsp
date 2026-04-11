@@ -67,26 +67,20 @@ class Sponsor(db.Model):
     custom_invitations = db.Column(db.Integer, nullable=True)
     bonus_invitations = db.Column(db.Integer, nullable=False, default=0)
     total_invitations = db.Column(db.Integer, nullable=False, default=0)
-    entries_count = db.Column(db.Integer, nullable=False, default=0)
 
-    invitation_token = db.Column(
-        db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
-    )
     email_sent_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-    scan_logs = db.relationship(
-        "ScanLog",
+    invitations = db.relationship(
+        "Invitation",
         backref="sponsor",
         cascade="all, delete-orphan",
-        order_by="ScanLog.scanned_at.desc()",
+        order_by="Invitation.number",
     )
-    guests = db.relationship(
-        "Guest",
-        backref="sponsor",
-        cascade="all, delete-orphan",
-        order_by="Guest.id",
-    )
+
+    @property
+    def entries_count(self) -> int:
+        return sum(1 for inv in self.invitations if inv.scanned_at is not None)
 
     @property
     def remaining_invitations(self) -> int:
@@ -97,28 +91,28 @@ class Sponsor(db.Model):
         return self.entries_count >= self.total_invitations
 
 
-class ScanLog(db.Model):
-    __tablename__ = "scan_logs"
+class Invitation(db.Model):
+    __tablename__ = "invitations"
 
     id = db.Column(db.Integer, primary_key=True)
     sponsor_id = db.Column(
         db.Integer, db.ForeignKey("sponsors.id", ondelete="CASCADE"), nullable=False
     )
-    count = db.Column(db.Integer, nullable=False, default=1)
+    number = db.Column(db.Integer, nullable=False)
+    token = db.Column(
+        db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
+    )
     guest_name = db.Column(db.String(200), nullable=True)
-    scanned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-
-
-class Guest(db.Model):
-    __tablename__ = "guests"
-
-    id = db.Column(db.Integer, primary_key=True)
-    sponsor_id = db.Column(
-        db.Integer, db.ForeignKey("sponsors.id", ondelete="CASCADE"), nullable=False
+    scanned_at = db.Column(db.DateTime, nullable=True)
+    scanned_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
-    name = db.Column(db.String(200), nullable=False)
-    checked_in = db.Column(db.Boolean, nullable=False, default=False)
-    checked_in_at = db.Column(db.DateTime, nullable=True)
+
+    scanned_by = db.relationship("User", foreign_keys=[scanned_by_user_id], lazy=True)
+
+    @property
+    def is_scanned(self) -> bool:
+        return self.scanned_at is not None
 
 
 class AuditLog(db.Model):
@@ -135,7 +129,7 @@ class AuditLog(db.Model):
     target_id = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-    user = db.relationship("User", backref="audit_logs", lazy=True)
+    user = db.relationship("User", foreign_keys=[user_id], backref="audit_logs", lazy=True)
 
 
 class SmtpConfig(db.Model):

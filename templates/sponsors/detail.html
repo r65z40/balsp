@@ -30,7 +30,7 @@
 
           <dt class="col-sm-4">Invitations</dt>
           <dd class="col-sm-8">
-            <strong>{{ sponsor.entries_count }} / {{ sponsor.total_invitations }}</strong> entrées enregistrées
+            <strong>{{ sponsor.entries_count }} / {{ sponsor.total_invitations }}</strong> personnes arrivées
             {% if sponsor.bonus_invitations %}
               <span class="badge text-bg-info ms-2">dont {{ sponsor.bonus_invitations }} bonus</span>
             {% endif %}
@@ -46,7 +46,7 @@
           </dd>
         </dl>
 
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 flex-wrap">
           <a href="{{ url_for('sponsors.edit', sponsor_id=sponsor.id) }}" class="btn btn-outline-primary">Modifier</a>
           <form method="post" action="{{ url_for('sponsors.send_email', sponsor_id=sponsor.id) }}" class="d-inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -54,84 +54,54 @@
               {% if sponsor.email_sent_at %}Renvoyer l'email{% else %}Envoyer l'invitation{% endif %}
             </button>
           </form>
+          <a href="{{ url_for('sponsors.qr_zip', sponsor_id=sponsor.id) }}" class="btn btn-outline-secondary">
+            &#x1F4E5; Télécharger tous les QR (.zip)
+          </a>
           <a href="{{ url_for('sponsors.list_sponsors') }}" class="btn btn-outline-secondary ms-auto">Retour</a>
         </div>
       </div>
     </div>
 
+    <!-- Liste des invitations + QR codes individuels -->
     <div class="card mb-4">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Invités nominatifs</span>
-        <span class="badge text-bg-secondary">{{ sponsor.guests|length }} nom(s)</span>
+        <span>Invitations ({{ sponsor.total_invitations }})</span>
+        <span class="badge text-bg-success">{{ sponsor.entries_count }} arrivé(s)</span>
       </div>
-      <div class="card-body">
-        {% if sponsor.guests %}
-        <ul class="list-group list-group-flush mb-3">
-          {% for g in sponsor.guests %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span>
-              {% if g.checked_in %}
-                <span class="badge text-bg-success me-2">Arrivé</span>
-              {% else %}
-                <span class="badge text-bg-light me-2">En attente</span>
-              {% endif %}
-              {{ g.name }}
-            </span>
-            <form method="post" action="{{ url_for('sponsors.delete_guest', sponsor_id=sponsor.id, guest_id=g.id) }}" class="d-inline" onsubmit="return confirm('Supprimer cet invité ?');">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger">Supprimer</button>
-            </form>
-          </li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-muted mb-3">Aucun invité nommé. L'ajout de noms est facultatif.</p>
-        {% endif %}
-
-        <form method="post" action="{{ url_for('sponsors.add_guest', sponsor_id=sponsor.id) }}" class="input-group">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <input type="text" name="guest_name" class="form-control" placeholder="Nom de l'invité" required>
-          <button class="btn btn-outline-primary">+ Ajouter</button>
-        </form>
-      </div>
-    </div>
-
-    {% if sponsor.scan_logs %}
-    <div class="card">
-      <div class="card-header">Historique des pointages</div>
       <ul class="list-group list-group-flush">
-        {% for log in sponsor.scan_logs %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          <span>
-            {{ log.scanned_at.strftime('%d/%m/%Y %H:%M:%S') }}
-            {% if log.guest_name %}
-              <span class="text-muted ms-2">— {{ log.guest_name }}</span>
-            {% endif %}
-          </span>
-          {% if log.count > 0 %}
-            <span class="badge text-bg-success">+{{ log.count }}</span>
-          {% else %}
-            <span class="badge text-bg-warning">{{ log.count }}</span>
-          {% endif %}
+        {% for inv, qr_url in invitation_qrs %}
+        <li class="list-group-item">
+          <div class="row align-items-center">
+            <div class="col-auto">
+              <img src="{{ qr_url }}" alt="QR #{{ inv.number }}" style="width: 120px; height: auto;">
+            </div>
+            <div class="col">
+              <div class="mb-2">
+                <strong class="h5">Invitation n°{{ inv.number }}</strong>
+                {% if inv.scanned_at %}
+                  <span class="badge text-bg-success ms-2">Arrivé — {{ inv.scanned_at.strftime('%d/%m %H:%M') }}</span>
+                {% else %}
+                  <span class="badge text-bg-light text-dark ms-2">En attente</span>
+                {% endif %}
+              </div>
+              <form method="post" action="{{ url_for('sponsors.rename_invitation', sponsor_id=sponsor.id, invitation_id=inv.id) }}" class="input-group input-group-sm mb-2">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="guest_name" class="form-control" value="{{ inv.guest_name or '' }}" placeholder="Nom de l'invité (facultatif)">
+                <button class="btn btn-outline-primary" type="submit">Enregistrer</button>
+              </form>
+              <div class="small">
+                <a href="{{ url_for('sponsors.qr_png', sponsor_id=sponsor.id, invitation_id=inv.id) }}" download="invitation-{{ inv.number }}.png" class="text-decoration-none">
+                  Télécharger PNG
+                </a>
+                <span class="text-muted ms-2">token : <code>{{ inv.token }}</code></span>
+              </div>
+            </div>
+          </div>
         </li>
+        {% else %}
+        <li class="list-group-item text-muted">Aucune invitation.</li>
         {% endfor %}
       </ul>
-    </div>
-    {% endif %}
-  </div>
-
-  <div class="col-lg-4">
-    <div class="card">
-      <div class="card-header">QR code d'invitation</div>
-      <div class="card-body text-center">
-        <img src="{{ qr_data_url }}" alt="QR code" class="img-fluid" style="max-width: 260px;">
-        <div class="mt-3">
-          <a href="{{ url_for('sponsors.qr_png', sponsor_id=sponsor.id) }}" class="btn btn-sm btn-outline-secondary" download="qr-{{ sponsor.company_name|replace(' ', '-') }}.png">
-            Télécharger PNG
-          </a>
-        </div>
-        <small class="text-muted d-block mt-2">Token : <code>{{ sponsor.invitation_token }}</code></small>
-      </div>
     </div>
   </div>
 </div>

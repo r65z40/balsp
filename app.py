@@ -82,25 +82,24 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @app.cli.command("migrate-db")
     def migrate_db():
-        """Ajoute les colonnes/tables manquantes sur une base existante."""
+        """Ajoute les colonnes/tables manquantes sur une base existante.
+
+        Gère également la transition de l'ancien schéma (1 QR par sponsor,
+        table ``guests``, table ``scan_logs``) vers le nouveau schéma basé
+        sur la table ``invitations`` (1 QR par personne).
+        """
+        import uuid as _uuid
+        from datetime import datetime
+
         from sqlalchemy import inspect, text
+
+        from models import AuditLog, Invitation
 
         inspector = inspect(db.engine)
         existing_tables = inspector.get_table_names()
 
-        # Table guests
-        if "guests" not in existing_tables:
-            from models import Guest
-
-            Guest.__table__.create(db.engine)
-            click.echo("Table 'guests' créée.")
-        else:
-            click.echo("Table 'guests' déjà présente.")
-
         # Table audit_logs
         if "audit_logs" not in existing_tables:
-            from models import AuditLog
-
             AuditLog.__table__.create(db.engine)
             click.echo("Table 'audit_logs' créée.")
         else:
@@ -121,18 +120,6 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             else:
                 click.echo("Colonne 'bonus_invitations' déjà présente.")
 
-        # Colonne guest_name sur scan_logs
-        if "scan_logs" in existing_tables:
-            cols = {c["name"] for c in inspector.get_columns("scan_logs")}
-            if "guest_name" not in cols:
-                db.session.execute(
-                    text("ALTER TABLE scan_logs ADD COLUMN guest_name VARCHAR(200)")
-                )
-                db.session.commit()
-                click.echo("Colonne 'guest_name' ajoutée à scan_logs.")
-            else:
-                click.echo("Colonne 'guest_name' déjà présente sur scan_logs.")
-
         # Colonne role sur users
         if "users" in existing_tables:
             cols = {c["name"] for c in inspector.get_columns("users")}
@@ -140,7 +127,6 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 db.session.execute(
                     text("ALTER TABLE users ADD COLUMN role VARCHAR(10) DEFAULT 'USER'")
                 )
-                # Promouvoir l'admin initial
                 admin_username = app.config["ADMIN_USERNAME"]
                 db.session.execute(
                     text("UPDATE users SET role = 'ADMIN' WHERE username = :u"),
@@ -150,6 +136,88 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 click.echo("Colonne 'role' ajoutée à users. Admin promu.")
             else:
                 click.echo("Colonne 'role' déjà présente sur users.")
+
+        # Table invitations (1 QR code par personne)
+        existing_tables = inspect(db.engine).get_table_names()
+        if "invitations" not in existing_tables:
+            Invitation.__table__.create(db.engine)
+            click.echo("Table 'invitations' créée.")
+
+            # Migration des données de l'ancien schéma (1 sponsor = 1 QR)
+            # vers le nouveau (N QR par sponsor).
+            if "sponsors" in existing_tables:
+                sponsor_cols = {c["name"] for c in inspector.get_columns("sponsors")}
+                has_old_token = "invitation_token" in sponsor_cols
+                has_old_entries = "entries_count" in sponsor_cols
+
+                select_fields = ["id", "total_invitations"]
+                if has_old_token:
+                    select_fields.append("invitation_token")
+                if has_old_entries:
+                    select_fields.append("entries_count")
+
+                rows = db.session.execute(
+                    text(f"SELECT {', '.join(select_fields)} FROM sponsors")
+                ).mappings().all()
+
+                # Récupérer les guests nommés de l'ancien schéma, si présents
+                old_guests: dict[int, list[dict]] = {}
+                if "guests" in existing_tables:
+                    guest_rows = db.session.execute(
+                        text(
+                            "SELECT sponsor_id, name, checked_in, checked_in_at "
+                            "FROM guests ORDER BY id"
+                        )
+                    ).mappings().all()
+                    for g in guest_rows:
+                        old_guests.setdefault(g["sponsor_id"], []).append(dict(g))
+
+                created = 0
+                for row in rows:
+                    sponsor_id = row["id"]
+                    total = int(row["total_invitations"] or 0)
+                    old_token = row.get("invitation_token") if has_old_token else None
+                    old_entries = int(row.get("entries_count") or 0) if has_old_entries else 0
+                    guests = old_guests.get(sponsor_id, [])
+
+                    now = datetime.utcnow()
+                    for n in range(1, total + 1):
+                        token = (
+                            old_token
+                            if n == 1 and old_token
+                            else str(_uuid.uuid4())
+                        )
+                        scanned_at = now if n <= old_entries else None
+                        guest_name = None
+                        if guests:
+                            # On attribue les noms d'invités dans l'ordre
+                            g = guests.pop(0)
+                            guest_name = g.get("name")
+                            # Si le guest était déjà coché mais que cette
+                            # invitation n'est pas marquée comme scannée,
+                            # on marque malgré tout pour préserver l'état.
+                            if g.get("checked_in") and scanned_at is None:
+                                scanned_at = now
+
+                        db.session.add(
+                            Invitation(
+                                sponsor_id=sponsor_id,
+                                number=n,
+                                token=token,
+                                guest_name=guest_name,
+                                scanned_at=scanned_at,
+                            )
+                        )
+                        created += 1
+
+                db.session.commit()
+                if created:
+                    click.echo(
+                        f"Migration : {created} invitations créées à partir "
+                        f"de {len(rows)} sponsor(s)."
+                    )
+        else:
+            click.echo("Table 'invitations' déjà présente.")
 
         click.echo("Migration terminée.")
 

@@ -1,4 +1,4 @@
-"""Envoi d'emails SMTP avec QR code inline et template personnalisable."""
+"""Envoi d'emails SMTP avec plusieurs QR codes inline et template personnalisable."""
 from __future__ import annotations
 
 import re
@@ -10,7 +10,9 @@ from email.utils import formataddr, make_msgid
 from string import Template
 from typing import Optional
 
-from models import EmailTemplate, SmtpConfig, Sponsor
+from flask import current_app
+
+from models import EmailTemplate, Invitation, SmtpConfig, Sponsor
 from utils.crypto import decrypt
 from utils.qr import generate_qr_png
 
@@ -49,7 +51,36 @@ def _strip_html(html: str) -> str:
     return text.strip()
 
 
-def build_context(sponsor: Sponsor, qr_cid: str) -> dict[str, str]:
+def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
+    """Construit le bloc HTML contenant toutes les images QR inline."""
+    parts = []
+    for inv, cid in zip(invitations, cids):
+        name_block = ""
+        if inv.guest_name:
+            name_block = (
+                f'<div style="color:#555; font-size:14px; margin-top:4px;">'
+                f'Au nom de <strong>{inv.guest_name}</strong></div>'
+            )
+        parts.append(
+            f'<div style="display:inline-block; margin:12px; text-align:center; '
+            f'vertical-align:top;">'
+            f'<img src="cid:{cid}" alt="QR invitation {inv.number}" '
+            f'style="max-width:240px; height:auto; border:1px solid #eee; padding:6px; '
+            f'background:#fff;">'
+            f'{name_block}'
+            f'</div>'
+        )
+    return (
+        '<div style="text-align:center; margin:25px 0;">'
+        + "".join(parts)
+        + "</div>"
+    )
+
+
+def build_context(
+    sponsor: Sponsor,
+    qr_codes_html: str = "",
+) -> dict[str, str]:
     """Variables disponibles pour la substitution dans le template d'email."""
     montant = f"{sponsor.amount:.2f} €" if sponsor.amount is not None else "—"
     return {
@@ -60,7 +91,9 @@ def build_context(sponsor: Sponsor, qr_cid: str) -> dict[str, str]:
         "nb_invitations": str(sponsor.total_invitations),
         "tier": sponsor.tier.label if sponsor.tier else "",
         "montant": montant,
-        "qr_cid": f"cid:{qr_cid}",
+        "qr_codes": qr_codes_html,
+        # Rétro-compat : ancienne variable pour templates historiques
+        "qr_cid": qr_codes_html,
     }
 
 
@@ -87,17 +120,30 @@ def _send(smtp: SmtpSettings, msg: EmailMessage) -> None:
             server.send_message(msg)
 
 
+def _bal_logo_path() -> Optional[str]:
+    try:
+        path = str(current_app.config.get("BAL_LOGO_PATH", ""))
+        return path if path else None
+    except RuntimeError:
+        return None
+
+
 def send_invitation_email(
     smtp: SmtpSettings,
     template: EmailTemplate,
     sponsor: Sponsor,
-    qr_payload: str,
+    invitations: Optional[list[Invitation]] = None,
     recipient_override: Optional[str] = None,
 ) -> None:
-    """Envoie l'email d'invitation avec QR code inline au sponsor."""
-    qr_cid = make_msgid(domain="balsp.local")[1:-1]  # retire <>
-    context = build_context(sponsor, qr_cid)
+    """Envoie l'email d'invitation avec tous les QR codes inline."""
+    if invitations is None:
+        invitations = list(sponsor.invitations)
 
+    # Un CID distinct par invitation
+    cids = [make_msgid(domain="balsp.local")[1:-1] for _ in invitations]
+    qr_html = _build_qr_codes_html(invitations, cids)
+
+    context = build_context(sponsor, qr_codes_html=qr_html)
     subject = render_template(template.subject, context)
     body_html = render_template(template.body_html, context)
     body_text = _strip_html(body_html)
@@ -110,16 +156,24 @@ def send_invitation_email(
     msg.set_content(body_text or "Veuillez ouvrir cet email en HTML.")
     msg.add_alternative(body_html, subtype="html")
 
-    # Pièce jointe inline : QR code
-    qr_png = generate_qr_png(qr_payload)
+    # Attache chaque QR code en pièce jointe inline (CID)
     html_part = msg.get_payload()[1]
-    html_part.add_related(
-        qr_png,
-        maintype="image",
-        subtype="png",
-        cid=f"<{qr_cid}>",
-        filename="invitation-qr.png",
-    )
+    logo_path = _bal_logo_path()
+    total = len(invitations)
+    for inv, cid in zip(invitations, cids):
+        qr_png = generate_qr_png(
+            inv.token,
+            number=inv.number,
+            total=total,
+            logo_path=logo_path,
+        )
+        html_part.add_related(
+            qr_png,
+            maintype="image",
+            subtype="png",
+            cid=f"<{cid}>",
+            filename=f"invitation-{inv.number}.png",
+        )
 
     _send(smtp, msg)
 
