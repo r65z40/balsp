@@ -23,13 +23,27 @@ class Tier(enum.Enum):
         return self.value
 
 
+class Role(enum.Enum):
+    ADMIN = "admin"
+    USER = "utilisateur"
+
+    @property
+    def label(self) -> str:
+        return self.value
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.Enum(Role), nullable=False, default=Role.USER)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == Role.ADMIN
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
@@ -104,6 +118,23 @@ class Guest(db.Model):
     name = db.Column(db.String(200), nullable=False)
     checked_in = db.Column(db.Boolean, nullable=False, default=False)
     checked_in_at = db.Column(db.DateTime, nullable=True)
+
+
+class AuditLog(db.Model):
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    username = db.Column(db.String(80), nullable=False)
+    action = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    target_type = db.Column(db.String(50), nullable=True)
+    target_id = db.Column(db.Integer, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", backref="audit_logs", lazy=True)
 
 
 class SmtpConfig(db.Model):

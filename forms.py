@@ -91,6 +91,13 @@ class SponsorForm(FlaskForm):
         return ok
 
 
+class UserForm(FlaskForm):
+    username = StringField("Nom d'utilisateur", validators=[DataRequired(), Length(min=3, max=80)])
+    password = PasswordField("Mot de passe", validators=[Optional(), Length(min=4)])
+    role = SelectField("Rôle", choices=[("USER", "Utilisateur"), ("ADMIN", "Administrateur")])
+    submit = SubmitField("Enregistrer")
+
+
 class SmtpConfigForm(FlaskForm):
     host = StringField("Serveur SMTP", validators=[DataRequired(), Length(max=200)])
     port = IntegerField("Port", validators=[DataRequired(), NumberRange(min=1, max=65535)])

@@ -4,7 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, flash, redirect, render_template, url_for
 from flask_login import login_required
 
-from extensions import db
+from extensions import admin_required, db, log_action
 from forms import EmailTemplateForm, SmtpConfigForm
 from models import EmailTemplate, SmtpConfig, Sponsor, Tier
 from utils.crypto import encrypt
@@ -22,6 +22,7 @@ bp = Blueprint("settings", __name__, url_prefix="/settings")
 
 @bp.route("/", methods=["GET", "POST"])
 @login_required
+@admin_required
 def smtp():
     cfg = SmtpConfig.query.first()
     form = SmtpConfigForm(obj=cfg) if cfg else SmtpConfigForm()
@@ -63,6 +64,7 @@ def smtp():
         cfg.use_ssl = form.use_ssl.data
         cfg.from_name = form.from_name.data.strip()
         cfg.from_email = form.from_email.data.strip()
+        log_action("edit_smtp", "Configuration SMTP modifiée.")
         db.session.commit()
         flash("Configuration SMTP enregistrée.", "success")
         return redirect(url_for("settings.smtp"))
@@ -86,6 +88,7 @@ def _sample_sponsor() -> Sponsor:
 
 @bp.route("/email", methods=["GET", "POST"])
 @login_required
+@admin_required
 def email_template():
     tpl = EmailTemplate.query.first()
     if not tpl:
@@ -100,6 +103,7 @@ def email_template():
         if form.restore.data:
             tpl.subject = DEFAULT_EMAIL_SUBJECT
             tpl.body_html = DEFAULT_EMAIL_BODY
+            log_action("restore_email_template", "Modèle d'email restauré par défaut.")
             db.session.commit()
             flash("Modèle par défaut restauré.", "success")
             return redirect(url_for("settings.email_template"))
@@ -155,6 +159,7 @@ def email_template():
         # Sauvegarde
         tpl.subject = form.subject.data
         tpl.body_html = form.body_html.data
+        log_action("edit_email_template", "Modèle d'email modifié.")
         db.session.commit()
         flash("Modèle d'email enregistré.", "success")
         return redirect(url_for("settings.email_template"))

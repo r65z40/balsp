@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Accès refusé — Bal des Pompiers{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <h1 class="display-4 text-danger">Accès refusé</h1>
+  <p class="lead">Vous n'avez pas les droits nécessaires pour accéder à cette page.</p>
+  <a href="{{ url_for('dashboard.index') }}" class="btn btn-pompier mt-3">Retour au tableau de bord</a>
+</div>
+{% endblock %}

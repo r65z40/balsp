@@ -4,7 +4,7 @@ from __future__ import annotations
 from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import login_required
 
-from extensions import csrf, db
+from extensions import csrf, db, log_action
 from models import Guest, ScanLog, Sponsor
 
 bp = Blueprint("scan", __name__, url_prefix="/scan")
@@ -107,6 +107,10 @@ def check_in():
         )
         db.session.add(guest)
 
+    desc = f"Check-in +{count} pour « {sponsor.company_name} »."
+    if guest_name:
+        desc += f" Invité : {guest_name}."
+    log_action("check_in", desc, "sponsor", sponsor.id)
     db.session.commit()
 
     return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})
@@ -130,6 +134,7 @@ def undo():
         return jsonify({"ok": False, "error": "Aucun pointage à annuler."}), 400
 
     sponsor.entries_count = max(0, sponsor.entries_count - last_log.count)
+    log_action("undo_check_in", f"Annulation de {last_log.count} entrée(s) pour « {sponsor.company_name} ».", "sponsor", sponsor.id)
     db.session.delete(last_log)
     db.session.commit()
     return jsonify({"ok": True, "sponsor": _sponsor_payload(sponsor)})
@@ -152,6 +157,8 @@ def guest_toggle():
 
     guest.checked_in = not guest.checked_in
     guest.checked_in_at = datetime.utcnow() if guest.checked_in else None
+    action = "pointé" if guest.checked_in else "dépointé"
+    log_action("toggle_guest", f"Invité « {guest.name} » {action} (sponsor « {guest.sponsor.company_name} »).", "sponsor", guest.sponsor_id)
     db.session.commit()
 
     sponsor = guest.sponsor

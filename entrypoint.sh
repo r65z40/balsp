@@ -5,6 +5,9 @@ set -e
 if [ ! -f /app/instance/balsp.db ]; then
     echo "Initialisation de la base de données..."
     flask init-db
+else
+    echo "Migration de la base existante..."
+    flask migrate-db
 fi
 
 # Générer un certificat auto-signé si absent et HTTPS activé

@@ -19,7 +19,7 @@ from flask import (
 from flask_login import login_required
 from werkzeug.utils import secure_filename
 
-from extensions import db
+from extensions import db, log_action
 from forms import SponsorForm
 from models import EmailTemplate, Guest, SmtpConfig, Sponsor, Tier
 from utils.mailer import SmtpSettings, send_invitation_email
@@ -93,6 +93,8 @@ def new_sponsor():
             _apply_form_to_sponsor(form, sponsor)
             sponsor.logo_filename = _save_logo(form.logo.data)
             db.session.add(sponsor)
+            db.session.flush()
+            log_action("create_sponsor", f"Sponsor « {sponsor.company_name} » créé.", "sponsor", sponsor.id)
             db.session.commit()
             flash("Sponsor créé avec succès.", "success")
             return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
@@ -130,6 +132,7 @@ def edit(sponsor_id: int):
             if new_logo:
                 _delete_logo(sponsor.logo_filename)
                 sponsor.logo_filename = new_logo
+            log_action("edit_sponsor", f"Sponsor « {sponsor.company_name} » modifié.", "sponsor", sponsor.id)
             db.session.commit()
             flash("Sponsor mis à jour.", "success")
             return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
@@ -145,6 +148,8 @@ def edit(sponsor_id: int):
 def delete(sponsor_id: int):
     sponsor = Sponsor.query.get_or_404(sponsor_id)
     _delete_logo(sponsor.logo_filename)
+    company = sponsor.company_name
+    log_action("delete_sponsor", f"Sponsor « {company} » supprimé.", "sponsor", sponsor.id)
     db.session.delete(sponsor)
     db.session.commit()
     flash("Sponsor supprimé.", "success")
@@ -179,6 +184,7 @@ def send_email(sponsor_id: int):
         smtp = SmtpSettings.from_db(smtp_cfg)
         send_invitation_email(smtp, template, sponsor, sponsor.invitation_token)
         sponsor.email_sent_at = datetime.utcnow()
+        log_action("send_email", f"Email envoyé à {sponsor.contact_email} (sponsor « {sponsor.company_name} »).", "sponsor", sponsor.id)
         db.session.commit()
         flash(f"Email envoyé à {sponsor.contact_email}.", "success")
     except Exception as exc:  # noqa: BLE001
@@ -197,6 +203,7 @@ def add_guest(sponsor_id: int):
     else:
         guest = Guest(sponsor_id=sponsor.id, name=name)
         db.session.add(guest)
+        log_action("add_guest", f"Invité « {name} » ajouté au sponsor « {sponsor.company_name} ».", "sponsor", sponsor.id)
         db.session.commit()
         flash(f"Invité « {name} » ajouté.", "success")
     return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
@@ -206,6 +213,9 @@ def add_guest(sponsor_id: int):
 @login_required
 def delete_guest(sponsor_id: int, guest_id: int):
     guest = Guest.query.filter_by(id=guest_id, sponsor_id=sponsor_id).first_or_404()
+    guest_name = guest.name
+    sponsor = Sponsor.query.get_or_404(sponsor_id)
+    log_action("delete_guest", f"Invité « {guest_name} » supprimé du sponsor « {sponsor.company_name} ».", "sponsor", sponsor_id)
     db.session.delete(guest)
     db.session.commit()
     flash("Invité supprimé.", "success")
