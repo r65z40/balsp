@@ -92,14 +92,38 @@ def build_context(
         "tier": sponsor.tier.label if sponsor.tier else "",
         "montant": montant,
         "qr_codes": qr_codes_html,
-        # Rétro-compat : ancienne variable pour templates historiques
-        "qr_cid": qr_codes_html,
     }
+
+
+# Regex : ancien pattern <img src="cid:${qr_cid}" ...> éventuellement
+# enveloppé dans un <p ...> ... </p>
+_OLD_QR_CID_PATTERN = re.compile(
+    r"<p[^>]*>\s*<img[^>]*src=[\"']cid:\$\{qr_cid\}[\"'][^>]*/?\s*>\s*</p>",
+    re.IGNORECASE | re.DOTALL,
+)
+_OLD_QR_CID_BARE = re.compile(
+    r"<img[^>]*src=[\"']cid:\$\{qr_cid\}[\"'][^>]*/?\s*>",
+    re.IGNORECASE,
+)
+
+
+def upgrade_legacy_template(html: str) -> str:
+    """Remplace l'ancien ``<img src="cid:${qr_cid}">`` par ``${qr_codes}``.
+
+    L'ancien schéma utilisait un seul QR par sponsor avec la variable
+    ``${qr_cid}`` dans un attribut ``src``. Le nouveau schéma injecte un
+    bloc HTML complet via ``${qr_codes}``.
+    """
+    result = _OLD_QR_CID_PATTERN.sub("${qr_codes}", html)
+    if result != html:
+        return result
+    return _OLD_QR_CID_BARE.sub("${qr_codes}", html)
 
 
 def render_template(template_str: str, context: dict[str, str]) -> str:
     """Interpolation des variables via `str.Template` (syntaxe ${var})."""
-    return Template(template_str).safe_substitute(context)
+    upgraded = upgrade_legacy_template(template_str)
+    return Template(upgraded).safe_substitute(context)
 
 
 def _send(smtp: SmtpSettings, msg: EmailMessage) -> None:

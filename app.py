@@ -288,6 +288,16 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         else:
             click.echo("Table 'invitations' déjà présente.")
 
+        # Mise à jour du template d'email : remplacer l'ancien pattern
+        # <img src="cid:${qr_cid}"> par ${qr_codes} (bloc multi-QR).
+        tpl = EmailTemplate.query.first()
+        if tpl and "${qr_cid}" in (tpl.body_html or ""):
+            from utils.mailer import upgrade_legacy_template
+
+            tpl.body_html = upgrade_legacy_template(tpl.body_html)
+            db.session.commit()
+            click.echo("Template d'email mis à jour (${qr_cid} → ${qr_codes}).")
+
         click.echo("Migration terminée.")
 
     return app
