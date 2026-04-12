@@ -73,12 +73,12 @@ def _build_qr_image(
 
     if number is not None:
         # Ajoute un bandeau blanc en dessous avec le numéro
-        label_height = 60
+        label_height = 80
         canvas = Image.new("RGB", (img.size[0], img.size[1] + label_height), "white")
         canvas.paste(img, (0, 0))
 
         draw = ImageDraw.Draw(canvas)
-        font = _load_font(32)
+        font = _load_font(48)
         if total:
             text = f"Invitation {number} / {total}"
         else:
