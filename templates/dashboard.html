@@ -1,47 +1,48 @@
 {% extends "base.html" %}
 {% block title %}Tableau de bord — Bal des Pompiers d'Auxerre{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
   <h1 class="h3 mb-0">&#x1F6A8; Tableau de bord</h1>
-  <div>
+  <div class="d-flex flex-wrap gap-2">
     <a href="{{ url_for('sponsors.new_sponsor') }}" class="btn btn-primary">+ Nouveau sponsor</a>
     <a href="{{ url_for('scan.page') }}" class="btn btn-outline-danger">Ouvrir le scanner</a>
   </div>
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-4">
+  <div class="col-4">
     <div class="card stat-sponsors h-100">
-      <div class="card-body">
+      <div class="card-body text-center px-2">
         <div class="text-uppercase small opacity-75">Sponsors</div>
         <div class="display-5">{{ total_sponsors }}</div>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-4">
     <div class="card stat-invitations h-100">
-      <div class="card-body">
-        <div class="text-uppercase small opacity-75">Invitations totales</div>
+      <div class="card-body text-center px-2">
+        <div class="text-uppercase small opacity-75">Invitations</div>
         <div class="display-5">{{ total_invitations }}</div>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-4">
     <div class="card stat-entries h-100">
-      <div class="card-body">
-        <div class="text-uppercase small opacity-75">Entrées enregistrées</div>
+      <div class="card-body text-center px-2">
+        <div class="text-uppercase small opacity-75">Entrées</div>
         <div class="display-5">{{ total_entries }}</div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="card">
+{# ---- Desktop : tableau classique (md+) ---- #}
+<div class="card d-none d-md-block">
   <div class="card-header" style="background: var(--pompier-light);">
     <strong>Sponsors</strong>
   </div>
   <div class="table-responsive">
-    <table class="table table-striped mb-0">
+    <table class="table table-striped mb-0 align-middle">
       <thead>
         <tr>
           <th>Entreprise</th>
@@ -86,5 +87,43 @@
       </tbody>
     </table>
   </div>
+</div>
+
+{# ---- Mobile : liste de cartes (< md) ---- #}
+<div class="d-md-none">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <strong>Sponsors</strong>
+  </div>
+  {% for s in sponsors %}
+  <a href="{{ url_for('sponsors.detail', sponsor_id=s.id) }}" class="card mb-2 text-decoration-none sponsor-card">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2 text-truncate">
+          {% if s.logo_filename %}
+            <img src="{{ url_for('static', filename='uploads/logos/' ~ s.logo_filename) }}" alt="" height="28" class="flex-shrink-0">
+          {% endif %}
+          <div class="text-truncate">
+            <strong class="text-body">{{ s.company_name }}</strong>
+            <div class="text-muted small">{{ s.tier.label }}</div>
+          </div>
+        </div>
+        <div class="text-end flex-shrink-0 ms-2">
+          <span class="fw-bold text-body">{{ s.entries_count }}/{{ s.total_invitations }}</span>
+          {% if s.email_sent_at %}
+            <span class="badge text-bg-success ms-1">Envoyé</span>
+          {% else %}
+            <span class="badge text-bg-warning ms-1">Att.</span>
+          {% endif %}
+        </div>
+      </div>
+      {% set pct = (s.entries_count / s.total_invitations * 100) if s.total_invitations else 0 %}
+      <div class="progress mt-2" style="height: 5px;">
+        <div class="progress-bar {% if s.is_full %}bg-success{% endif %}" style="width: {{ pct }}%"></div>
+      </div>
+    </div>
+  </a>
+  {% else %}
+  <div class="text-center text-muted py-4">Aucun sponsor pour le moment.</div>
+  {% endfor %}
 </div>
 {% endblock %}

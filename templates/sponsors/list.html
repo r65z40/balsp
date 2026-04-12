@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Sponsors — Bal des Pompiers{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
   <h1 class="h3 mb-0">Sponsors</h1>
   <a href="{{ url_for('sponsors.new_sponsor') }}" class="btn btn-primary">+ Nouveau sponsor</a>
 </div>
 
-<div class="card">
+{# ---- Desktop : tableau (md+) ---- #}
+<div class="card d-none d-md-block">
   <div class="table-responsive">
     <table class="table table-hover mb-0 align-middle">
       <thead>
@@ -54,5 +55,50 @@
       </tbody>
     </table>
   </div>
+</div>
+
+{# ---- Mobile : cartes (< md) ---- #}
+<div class="d-md-none">
+  {% for s in sponsors %}
+  <a href="{{ url_for('sponsors.detail', sponsor_id=s.id) }}" class="card mb-2 text-decoration-none sponsor-card">
+    <div class="card-body py-3 px-3">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        {% if s.logo_filename %}
+          <img src="{{ url_for('static', filename='uploads/logos/' ~ s.logo_filename) }}" alt="" height="32" class="flex-shrink-0">
+        {% endif %}
+        <div class="text-truncate">
+          <strong class="text-body">{{ s.company_name }}</strong>
+          <span class="badge text-bg-secondary ms-1">{{ s.tier.label }}</span>
+        </div>
+      </div>
+      <div class="row g-2 small">
+        <div class="col-6">
+          <span class="text-muted">Contact :</span> {{ s.contact_name }}
+        </div>
+        <div class="col-6 text-end">
+          <span class="text-muted">Montant :</span>
+          {% if s.amount %}{{ '%.2f'|format(s.amount) }} €{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <div>
+          <span class="fw-bold text-body">{{ s.entries_count }}/{{ s.total_invitations }}</span>
+          <span class="text-muted small ms-1">invitations</span>
+        </div>
+        {% if s.email_sent_at %}
+          <span class="badge text-bg-success">Envoyé</span>
+        {% else %}
+          <span class="badge text-bg-warning">En attente</span>
+        {% endif %}
+      </div>
+      {% set pct = (s.entries_count / s.total_invitations * 100) if s.total_invitations else 0 %}
+      <div class="progress mt-2" style="height: 5px;">
+        <div class="progress-bar {% if s.is_full %}bg-success{% endif %}" style="width: {{ pct }}%"></div>
+      </div>
+    </div>
+  </a>
+  {% else %}
+  <div class="text-center text-muted py-4">Aucun sponsor enregistré.</div>
+  {% endfor %}
 </div>
 {% endblock %}

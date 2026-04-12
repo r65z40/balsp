@@ -68,20 +68,29 @@
     invitations.forEach(inv => {
       const li = document.createElement('li');
       const isCurrent = inv.id === currentId;
-      li.className = 'list-group-item d-flex justify-content-between align-items-center'
-        + (isCurrent ? ' border-danger border-2' : '');
+      li.className = 'list-group-item' + (isCurrent ? ' border-danger border-2' : '');
       const badge = inv.scanned
-        ? '<span class="badge text-bg-success me-2">Arrivé</span>'
-        : '<span class="badge text-bg-light text-dark me-2">Attendu</span>';
+        ? '<span class="badge text-bg-success">Arrivé</span>'
+        : '<span class="badge text-bg-light text-dark">Attendu</span>';
       const nameHtml = inv.guest_name
         ? `<strong>${inv.guest_name}</strong>`
         : '<span class="text-muted">Sans nom</span>';
-      const scannedBy = inv.scanned_by ? ` <small class="text-muted">par ${inv.scanned_by}</small>` : '';
+      const timeHtml = inv.scanned_at
+        ? `<span class="text-muted small">${inv.scanned_at}</span>` : '';
+      const scannedBy = inv.scanned_by
+        ? `<span class="text-muted small">par ${inv.scanned_by}</span>` : '';
       li.innerHTML = `
-        <span>${badge}<span class="me-2">#${inv.number}</span>${nameHtml}${scannedBy}</span>
-        <button class="btn btn-sm ${inv.scanned ? 'btn-outline-secondary' : 'btn-outline-success'} inv-toggle" data-id="${inv.id}">
-          ${inv.scanned ? 'Annuler' : 'Pointer'}
-        </button>
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              ${badge} <span>#${inv.number}</span> ${nameHtml}
+            </div>
+            ${inv.scanned ? `<div class="ps-1">${timeHtml} ${scannedBy}</div>` : ''}
+          </div>
+          <button class="btn btn-sm ${inv.scanned ? 'btn-outline-secondary' : 'btn-outline-success'} inv-toggle flex-shrink-0 ms-2" data-id="${inv.id}">
+            ${inv.scanned ? 'Annuler' : 'Pointer'}
+          </button>
+        </div>
       `;
       invitationList.appendChild(li);
     });

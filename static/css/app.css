@@ -131,10 +131,49 @@ a:hover {
   border-top: 2px solid var(--pompier-gold);
 }
 
+/* Sponsor cards mobile */
+.sponsor-card {
+  transition: box-shadow 0.15s;
+}
+
+.sponsor-card:hover {
+  box-shadow: 0 4px 16px rgba(139, 0, 0, 0.15);
+}
+
 /* Footer texte */
 .footer-pompier {
   color: #999;
   font-size: 0.8rem;
   text-align: center;
   padding: 2rem 0 1rem;
+}
+
+/* ---- Mobile (< 768px) ---- */
+@media (max-width: 767.98px) {
+  .display-5 {
+    font-size: 2rem;
+  }
+
+  .container {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .navbar-pompier .navbar-brand {
+    font-size: 0.95rem;
+  }
+
+  /* Scanner : bouton pleine largeur */
+  #btn-rescan {
+    font-size: 1.1rem;
+  }
+
+  /* Réduire le padding des cards */
+  .card-body {
+    padding: 0.75rem;
+  }
+
+  .card-header {
+    padding: 0.5rem 0.75rem;
+  }
 }
