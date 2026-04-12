@@ -95,26 +95,26 @@ def build_context(
     }
 
 
-# Regex : ancien pattern <img src="cid:${qr_cid}" ...> éventuellement
-# enveloppé dans un <p ...> ... </p>
-_OLD_QR_CID_PATTERN = re.compile(
-    r"<p[^>]*>\s*<img[^>]*src=[\"']cid:\$\{qr_cid\}[\"'][^>]*/?\s*>\s*</p>",
+# Regex : ancien pattern <img src="${qr_cid}" ...> ou <img src="cid:${qr_cid}" ...>
+# éventuellement enveloppé dans un <p ...> ... </p>
+_OLD_QR_CID_WRAPPED = re.compile(
+    r"<p[^>]*>\s*<img[^>]*src=[\"'](?:cid:)?\$\{qr_cid\}[\"'][^>]*/?\s*>\s*</p>",
     re.IGNORECASE | re.DOTALL,
 )
 _OLD_QR_CID_BARE = re.compile(
-    r"<img[^>]*src=[\"']cid:\$\{qr_cid\}[\"'][^>]*/?\s*>",
+    r"<img[^>]*src=[\"'](?:cid:)?\$\{qr_cid\}[\"'][^>]*/?\s*>",
     re.IGNORECASE,
 )
 
 
 def upgrade_legacy_template(html: str) -> str:
-    """Remplace l'ancien ``<img src="cid:${qr_cid}">`` par ``${qr_codes}``.
+    """Remplace l'ancien ``<img src="${qr_cid}">`` par ``${qr_codes}``.
 
     L'ancien schéma utilisait un seul QR par sponsor avec la variable
-    ``${qr_cid}`` dans un attribut ``src``. Le nouveau schéma injecte un
-    bloc HTML complet via ``${qr_codes}``.
+    ``${qr_cid}`` dans un attribut ``src`` (avec ou sans préfixe ``cid:``).
+    Le nouveau schéma injecte un bloc HTML complet via ``${qr_codes}``.
     """
-    result = _OLD_QR_CID_PATTERN.sub("${qr_codes}", html)
+    result = _OLD_QR_CID_WRAPPED.sub("${qr_codes}", html)
     if result != html:
         return result
     return _OLD_QR_CID_BARE.sub("${qr_codes}", html)
