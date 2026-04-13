@@ -82,10 +82,18 @@ class InvitationPDF(FPDF):
     def header(self):
         # Bandeau rouge
         self.set_fill_color(200, 16, 46)
-        self.rect(0, 0, 210, 28, "F")
+        self.rect(0, 0, 210, 32, "F")
+
+        # Logo dans le bandeau (à gauche)
+        if self.bal_logo_path:
+            try:
+                self.image(self.bal_logo_path, x=8, y=3, h=26)
+            except Exception:
+                pass
+
         self.set_text_color(255, 255, 255)
         self.set_font(self.font_family_name, "B", 16)
-        self.set_y(6)
+        self.set_y(7)
         self.cell(0, 8, self.safe_text("Bal des Sapeurs-Pompiers d'Auxerre"), align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_font(self.font_family_name, "", 11)
         self.set_text_color(240, 165, 0)
@@ -134,11 +142,9 @@ def generate_invitations_pdf(
             pdf.add_page()
             items_on_page = 0
 
-        # Generer le QR code en PNG
+        # Generer le QR code en PNG (sans le bandeau texte, le PDF ajoute le sien)
         qr_png = generate_qr_png(
             inv.token,
-            number=inv.number,
-            total=total,
             logo_path=bal_logo_path,
         )
 
