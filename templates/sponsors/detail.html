@@ -55,7 +55,10 @@
             </button>
           </form>
           <a href="{{ url_for('sponsors.qr_zip', sponsor_id=sponsor.id) }}" class="btn btn-outline-secondary">
-            &#x1F4E5; Télécharger tous les QR (.zip)
+            &#x1F4E5; QR codes (.zip)
+          </a>
+          <a href="{{ url_for('sponsors.qr_pdf', sponsor_id=sponsor.id) }}" class="btn btn-outline-secondary">
+            &#x1F4C4; PDF imprimable
           </a>
           <a href="{{ url_for('sponsors.list_sponsors') }}" class="btn btn-outline-secondary ms-auto">Retour</a>
         </div>

@@ -1,0 +1,167 @@
+"""Génération de PDF d'invitations avec QR codes."""
+from __future__ import annotations
+
+import io
+import os
+import tempfile
+from typing import Optional
+
+from fpdf import FPDF
+
+from models import Invitation, Sponsor
+from utils.qr import generate_qr_png
+
+
+def _find_ttf_font() -> Optional[str]:
+    """Trouve une police TTF Unicode sur le système."""
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def _find_ttf_font_bold() -> Optional[str]:
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+class InvitationPDF(FPDF):
+    """PDF A4 avec en-tête pompier et QR codes."""
+
+    def __init__(self, sponsor: Sponsor, bal_logo_path: Optional[str] = None):
+        super().__init__(orientation="P", unit="mm", format="A4")
+        self.sponsor = sponsor
+        self.bal_logo_path = bal_logo_path
+        self.set_auto_page_break(auto=True, margin=15)
+
+        # Police Unicode pour supporter les accents et tirets
+        ttf = _find_ttf_font()
+        ttf_bold = _find_ttf_font_bold()
+        if ttf:
+            self.add_font("CustomFont", "", ttf, uni=True)
+            if ttf_bold:
+                self.add_font("CustomFont", "B", ttf_bold, uni=True)
+            else:
+                self.add_font("CustomFont", "B", ttf, uni=True)
+            self.font_family_name = "CustomFont"
+        else:
+            self.font_family_name = "Helvetica"
+
+        self.add_page()
+
+    def header(self):
+        # Bandeau rouge
+        self.set_fill_color(200, 16, 46)
+        self.rect(0, 0, 210, 28, "F")
+        self.set_text_color(255, 255, 255)
+        self.set_font(self.font_family_name, "B", 16)
+        self.set_y(6)
+        self.cell(0, 8, "Bal des Sapeurs-Pompiers d'Auxerre", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.set_font(self.font_family_name, "", 11)
+        self.set_text_color(240, 165, 0)
+        self.cell(0, 6, f"Invitations - {self.sponsor.company_name}", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.set_text_color(0, 0, 0)
+        self.ln(8)
+
+    def footer(self):
+        self.set_y(-12)
+        self.set_font(self.font_family_name, "", 8)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
+
+
+def generate_invitations_pdf(
+    sponsor: Sponsor,
+    invitations: list[Invitation],
+    bal_logo_path: Optional[str] = None,
+) -> bytes:
+    """Genere un PDF A4 avec 2 QR codes par page."""
+    pdf = InvitationPDF(sponsor, bal_logo_path)
+    pdf.alias_nb_pages()
+    total = len(invitations)
+
+    # Infos sponsor sur la premiere page
+    pdf.set_font(pdf.font_family_name, "", 11)
+    pdf.cell(0, 6, f"Sponsor : {sponsor.company_name}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"Contact : {sponsor.contact_name} ({sponsor.contact_email})", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, f"Nombre d'invitations : {total}", new_x="LMARGIN", new_y="NEXT")
+    if sponsor.tier:
+        pdf.cell(0, 6, f"Categorie : {sponsor.tier.label}", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(6)
+
+    # Ligne de separation
+    pdf.set_draw_color(200, 16, 46)
+    pdf.set_line_width(0.5)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(6)
+
+    # 2 QR par page, centres verticalement
+    qr_size = 65  # mm
+    items_on_page = 0
+
+    for inv in invitations:
+        if items_on_page == 2:
+            pdf.add_page()
+            items_on_page = 0
+
+        # Generer le QR code en PNG
+        qr_png = generate_qr_png(
+            inv.token,
+            number=inv.number,
+            total=total,
+            logo_path=bal_logo_path,
+        )
+
+        # Sauvegarder temporairement le PNG pour fpdf
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(qr_png)
+            tmp_path = tmp.name
+
+        try:
+            start_y = pdf.get_y()
+
+            # Centrer le QR
+            x_qr = (210 - qr_size) / 2
+            pdf.image(tmp_path, x=x_qr, y=start_y, w=qr_size)
+
+            # Texte sous le QR
+            pdf.set_y(start_y + qr_size + 3)
+            pdf.set_font(pdf.font_family_name, "B", 14)
+            pdf.set_text_color(139, 0, 0)
+            label = f"Invitation {inv.number} / {total}"
+            pdf.cell(0, 8, label, align="C", new_x="LMARGIN", new_y="NEXT")
+
+            if inv.guest_name:
+                pdf.set_font(pdf.font_family_name, "", 11)
+                pdf.set_text_color(80, 80, 80)
+                pdf.cell(0, 6, f"Au nom de : {inv.guest_name}", align="C", new_x="LMARGIN", new_y="NEXT")
+
+            pdf.set_text_color(0, 0, 0)
+            pdf.ln(8)
+
+            # Ligne pointillee entre les 2 QR de la page
+            if items_on_page == 0:
+                pdf.set_draw_color(180, 180, 180)
+                pdf.set_line_width(0.2)
+                pdf.dashed_line(20, pdf.get_y(), 190, pdf.get_y(), dash_length=3, space_length=2)
+                pdf.ln(6)
+
+            items_on_page += 1
+        finally:
+            os.unlink(tmp_path)
+
+    buf = io.BytesIO()
+    pdf.output(buf)
+    return buf.getvalue()

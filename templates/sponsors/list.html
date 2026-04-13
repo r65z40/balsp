@@ -1,9 +1,38 @@
 {% extends "base.html" %}
 {% block title %}Sponsors — Bal des Pompiers{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="h3 mb-0">Sponsors</h1>
   <a href="{{ url_for('sponsors.new_sponsor') }}" class="btn btn-primary">+ Nouveau sponsor</a>
+</div>
+
+{# ---- Barre de recherche + filtres ---- #}
+<div class="card mb-3">
+  <div class="card-body py-2 px-3">
+    <div class="row g-2 align-items-center">
+      <div class="col-12 col-md-5">
+        <input type="text" id="sponsor-search" class="form-control form-control-sm" placeholder="Rechercher (nom, contact, email)...">
+      </div>
+      <div class="col-6 col-md-3">
+        <select id="filter-tier" class="form-select form-select-sm">
+          <option value="">Tous les tiers</option>
+          {% for tier_val in tiers %}
+          <option value="{{ tier_val.label }}">{{ tier_val.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <select id="filter-email" class="form-select form-select-sm">
+          <option value="">Email : tous</option>
+          <option value="sent">Envoyé</option>
+          <option value="pending">En attente</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2 text-end">
+        <span id="sponsor-count" class="text-muted small"></span>
+      </div>
+    </div>
+  </div>
 </div>
 
 {# ---- Desktop : tableau (md+) ---- #}
@@ -22,9 +51,13 @@
           <th></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="sponsors-table-body">
         {% for s in sponsors %}
-        <tr>
+        <tr class="sponsor-item"
+            data-name="{{ s.company_name|lower }}"
+            data-contact="{{ s.contact_name|lower }} {{ s.contact_email|lower }}"
+            data-tier="{{ s.tier.label }}"
+            data-email="{{ 'sent' if s.email_sent_at else 'pending' }}">
           <td>
             {% if s.logo_filename %}
               <img src="{{ url_for('static', filename='uploads/logos/' ~ s.logo_filename) }}" alt="" height="40">
@@ -50,7 +83,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">Aucun sponsor enregistré.</td></tr>
+        <tr class="sponsor-empty"><td colspan="8" class="text-center text-muted py-4">Aucun sponsor enregistré.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -58,9 +91,14 @@
 </div>
 
 {# ---- Mobile : cartes (< md) ---- #}
-<div class="d-md-none">
+<div class="d-md-none" id="sponsors-cards">
   {% for s in sponsors %}
-  <a href="{{ url_for('sponsors.detail', sponsor_id=s.id) }}" class="card mb-2 text-decoration-none sponsor-card">
+  <a href="{{ url_for('sponsors.detail', sponsor_id=s.id) }}"
+     class="card mb-2 text-decoration-none sponsor-card sponsor-item"
+     data-name="{{ s.company_name|lower }}"
+     data-contact="{{ s.contact_name|lower }} {{ s.contact_email|lower }}"
+     data-tier="{{ s.tier.label }}"
+     data-email="{{ 'sent' if s.email_sent_at else 'pending' }}">
     <div class="card-body py-3 px-3">
       <div class="d-flex align-items-center gap-2 mb-2">
         {% if s.logo_filename %}
@@ -98,7 +136,54 @@
     </div>
   </a>
   {% else %}
-  <div class="text-center text-muted py-4">Aucun sponsor enregistré.</div>
+  <div class="text-center text-muted py-4 sponsor-empty">Aucun sponsor enregistré.</div>
   {% endfor %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  const searchInput = document.getElementById('sponsor-search');
+  const filterTier = document.getElementById('filter-tier');
+  const filterEmail = document.getElementById('filter-email');
+  const countEl = document.getElementById('sponsor-count');
+  const items = document.querySelectorAll('.sponsor-item');
+
+  function applyFilters() {
+    const query = (searchInput.value || '').toLowerCase().trim();
+    const tier = filterTier.value;
+    const email = filterEmail.value;
+    let visible = 0;
+
+    items.forEach(el => {
+      const name = el.dataset.name || '';
+      const contact = el.dataset.contact || '';
+      const elTier = el.dataset.tier || '';
+      const elEmail = el.dataset.email || '';
+
+      const matchSearch = !query || name.includes(query) || contact.includes(query);
+      const matchTier = !tier || elTier === tier;
+      const matchEmail = !email || elEmail === email;
+
+      const show = matchSearch && matchTier && matchEmail;
+      // For <tr> use display: table-row, for cards use display: block
+      if (el.tagName === 'TR') {
+        el.style.display = show ? '' : 'none';
+      } else {
+        el.style.display = show ? '' : 'none';
+      }
+      if (show) visible++;
+    });
+
+    countEl.textContent = visible + ' / ' + items.length;
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+  filterTier.addEventListener('change', applyFilters);
+  filterEmail.addEventListener('change', applyFilters);
+
+  applyFilters();
+})();
+</script>
 {% endblock %}

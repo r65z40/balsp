@@ -116,7 +116,7 @@ def _apply_form_to_sponsor(form: SponsorForm, sponsor: Sponsor) -> None:
 @login_required
 def list_sponsors():
     sponsors = Sponsor.query.order_by(Sponsor.created_at.desc()).all()
-    return render_template("sponsors/list.html", sponsors=sponsors)
+    return render_template("sponsors/list.html", sponsors=sponsors, tiers=list(Tier))
 
 
 @bp.route("/new", methods=["GET", "POST"])
@@ -235,6 +235,30 @@ def qr_zip(sponsor_id: int):
         mimetype="application/zip",
         as_attachment=True,
         download_name=f"qr-{safe_name}.zip",
+    )
+
+
+@bp.route("/<int:sponsor_id>/invitations/all.pdf")
+@login_required
+def qr_pdf(sponsor_id: int):
+    sponsor = Sponsor.query.get_or_404(sponsor_id)
+    if not sponsor.invitations:
+        flash("Ce sponsor n'a aucune invitation.", "warning")
+        return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
+
+    from utils.pdf import generate_invitations_pdf
+
+    pdf_bytes = generate_invitations_pdf(
+        sponsor,
+        list(sponsor.invitations),
+        bal_logo_path=_bal_logo_path(),
+    )
+    safe_name = sponsor.company_name.replace(" ", "-")
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"invitations-{safe_name}.pdf",
     )
 
 
