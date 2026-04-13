@@ -58,8 +58,26 @@ class InvitationPDF(FPDF):
             self.font_family_name = "CustomFont"
         else:
             self.font_family_name = "Helvetica"
+            self._latin1_mode = True
 
         self.add_page()
+
+    def safe_text(self, text: str) -> str:
+        """Remplace les caractères hors latin-1 si on est en mode Helvetica."""
+        if not getattr(self, "_latin1_mode", False):
+            return text
+        replacements = {
+            "\u2013": "-", "\u2014": "-", "\u2018": "'", "\u2019": "'",
+            "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u20ac": "EUR",
+            "\u2264": "<=", "\u2265": ">=",
+        }
+        for char, repl in replacements.items():
+            text = text.replace(char, repl)
+        try:
+            text.encode("latin-1")
+        except UnicodeEncodeError:
+            text = text.encode("latin-1", errors="replace").decode("latin-1")
+        return text
 
     def header(self):
         # Bandeau rouge
@@ -68,10 +86,10 @@ class InvitationPDF(FPDF):
         self.set_text_color(255, 255, 255)
         self.set_font(self.font_family_name, "B", 16)
         self.set_y(6)
-        self.cell(0, 8, "Bal des Sapeurs-Pompiers d'Auxerre", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 8, self.safe_text("Bal des Sapeurs-Pompiers d'Auxerre"), align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_font(self.font_family_name, "", 11)
         self.set_text_color(240, 165, 0)
-        self.cell(0, 6, f"Invitations - {self.sponsor.company_name}", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 6, self.safe_text(f"Invitations - {self.sponsor.company_name}"), align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_text_color(0, 0, 0)
         self.ln(8)
 
@@ -79,7 +97,7 @@ class InvitationPDF(FPDF):
         self.set_y(-12)
         self.set_font(self.font_family_name, "", 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f"Page {self.page_no()}/{{nb}}", align="C")
+        self.cell(0, 10, self.safe_text(f"Page {self.page_no()}/{{nb}}"), align="C")
 
 
 def generate_invitations_pdf(
@@ -94,11 +112,11 @@ def generate_invitations_pdf(
 
     # Infos sponsor sur la premiere page
     pdf.set_font(pdf.font_family_name, "", 11)
-    pdf.cell(0, 6, f"Sponsor : {sponsor.company_name}", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Contact : {sponsor.contact_name} ({sponsor.contact_email})", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 6, f"Nombre d'invitations : {total}", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, pdf.safe_text(f"Sponsor : {sponsor.company_name}"), new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, pdf.safe_text(f"Contact : {sponsor.contact_name} ({sponsor.contact_email})"), new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 6, pdf.safe_text(f"Nombre d'invitations : {total}"), new_x="LMARGIN", new_y="NEXT")
     if sponsor.tier:
-        pdf.cell(0, 6, f"Categorie : {sponsor.tier.label}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 6, pdf.safe_text(f"Categorie : {sponsor.tier.label}"), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(6)
 
     # Ligne de separation
@@ -140,13 +158,13 @@ def generate_invitations_pdf(
             pdf.set_y(start_y + qr_size + 3)
             pdf.set_font(pdf.font_family_name, "B", 14)
             pdf.set_text_color(139, 0, 0)
-            label = f"Invitation {inv.number} / {total}"
+            label = pdf.safe_text(f"Invitation {inv.number} / {total}")
             pdf.cell(0, 8, label, align="C", new_x="LMARGIN", new_y="NEXT")
 
             if inv.guest_name:
                 pdf.set_font(pdf.font_family_name, "", 11)
                 pdf.set_text_color(80, 80, 80)
-                pdf.cell(0, 6, f"Au nom de : {inv.guest_name}", align="C", new_x="LMARGIN", new_y="NEXT")
+                pdf.cell(0, 6, pdf.safe_text(f"Au nom de : {inv.guest_name}"), align="C", new_x="LMARGIN", new_y="NEXT")
 
             pdf.set_text_color(0, 0, 0)
             pdf.ln(8)

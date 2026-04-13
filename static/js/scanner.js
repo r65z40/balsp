@@ -29,7 +29,6 @@
   const currentName = document.getElementById('current-name');
   const currentStatus = document.getElementById('current-status');
   const invitationList = document.getElementById('invitation-list');
-  const historyList = document.getElementById('history-list');
 
   // Check-in controls
   const guestNameInput = document.getElementById('guest-name');
@@ -85,51 +84,6 @@
     if (navigator.vibrate) {
       try { navigator.vibrate(pattern); } catch (_) {}
     }
-  }
-
-  // --- History ---
-
-  const MAX_HISTORY = 15;
-  let history = [];
-
-  function addHistory(entry) {
-    history.unshift(entry);
-    if (history.length > MAX_HISTORY) history.pop();
-    renderHistory();
-  }
-
-  function renderHistory() {
-    if (!historyList) return;
-    const countEl = document.getElementById('history-count');
-    if (countEl) countEl.textContent = history.length;
-    historyList.innerHTML = '';
-    if (history.length === 0) {
-      historyList.innerHTML = '<li class="list-group-item text-muted small text-center py-2">Aucun scan récent</li>';
-      return;
-    }
-    history.forEach(h => {
-      const li = document.createElement('li');
-      li.className = 'list-group-item py-2 px-3';
-      const iconMap = { success: 'text-bg-success', warning: 'text-bg-warning', error: 'text-bg-danger', undo: 'text-bg-secondary' };
-      const labelMap = { success: 'OK', warning: 'Déjà', error: 'Err', undo: 'Ann.' };
-      const badgeClass = iconMap[h.type] || 'text-bg-secondary';
-      const badgeLabel = labelMap[h.type] || '?';
-      li.innerHTML = `
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <span class="badge ${badgeClass} me-1">${badgeLabel}</span>
-            <strong>${h.company || '?'}</strong> <span class="text-muted">#${h.number || '?'}</span>
-            ${h.guest ? ` — ${h.guest}` : ''}
-          </div>
-          <span class="text-muted small flex-shrink-0 ms-2">${h.time}</span>
-        </div>
-      `;
-      historyList.appendChild(li);
-    });
-  }
-
-  function nowTime() {
-    return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
   // --- UI helpers ---
@@ -274,13 +228,6 @@
     if (data.invitation.scanned) {
       feedbackWarning();
       showMessage('warning', `⚠️ Invitation n°${data.invitation.number} déjà utilisée.`);
-      addHistory({
-        type: 'warning',
-        company: data.sponsor.company_name,
-        number: data.invitation.number,
-        guest: data.invitation.guest_name,
-        time: nowTime(),
-      });
     } else {
       showMessage('info', `Invitation n°${data.invitation.number} — prête à être pointée.`);
     }
@@ -301,13 +248,6 @@
         renderSponsor(data.sponsor);
         renderCurrentInvitation(data.invitation);
       }
-      addHistory({
-        type: 'error',
-        company: data.sponsor ? data.sponsor.company_name : '?',
-        number: data.invitation ? data.invitation.number : '?',
-        guest: null,
-        time: nowTime(),
-      });
       return;
     }
     feedbackSuccess();
@@ -316,13 +256,6 @@
     const name = data.invitation.guest_name ? ` (${data.invitation.guest_name})` : '';
     showMessage('success', `✓ Invitation n°${data.invitation.number} pointée${name}.`);
     guestNameInput.value = '';
-    addHistory({
-      type: 'success',
-      company: data.sponsor.company_name,
-      number: data.invitation.number,
-      guest: data.invitation.guest_name,
-      time: nowTime(),
-    });
   }
 
   async function undo() {
@@ -336,13 +269,6 @@
     renderSponsor(data.sponsor);
     renderCurrentInvitation(data.invitation);
     showMessage('info', `Pointage de l'invitation n°${data.invitation.number} annulé.`);
-    addHistory({
-      type: 'undo',
-      company: data.sponsor.company_name,
-      number: data.invitation.number,
-      guest: data.invitation.guest_name,
-      time: nowTime(),
-    });
   }
 
   async function toggleInvitation(invitationId) {
@@ -361,13 +287,6 @@
     }
     const action = data.invitation.scanned ? 'pointée' : 'dépointée';
     showMessage('info', `Invitation n°${data.invitation.number} ${action}.`);
-    addHistory({
-      type: data.invitation.scanned ? 'success' : 'undo',
-      company: data.sponsor.company_name,
-      number: data.invitation.number,
-      guest: data.invitation.guest_name,
-      time: nowTime(),
-    });
   }
 
   // --- Camera ---
@@ -430,6 +349,4 @@
     await startScanner();
   });
 
-  // Init history
-  renderHistory();
 })();
