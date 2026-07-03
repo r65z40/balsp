@@ -51,11 +51,20 @@
         </div>
       </div>
 
+      <!-- Alerte DONNER BRACELET (conso) -->
+      <div id="conso-alert" class="d-none mb-3">
+        <div class="conso-flash text-center py-3 px-3 rounded-3">
+          <div class="display-6 fw-bold">DONNER BRACELET</div>
+          <div class="mt-1 fw-semibold">Invitation avec consommation</div>
+        </div>
+      </div>
+
       <!-- Invitation scannée : action principale -->
       <div id="current-invitation" class="card mb-3 d-none">
         <div class="card-header py-2">
           <strong>Invitation n°<span id="current-number">—</span></strong>
           <span id="current-status" class="badge ms-2">—</span>
+          <span id="current-conso-badge" class="badge ms-1 d-none"></span>
         </div>
         <div class="card-body py-3">
           <div class="mb-3">

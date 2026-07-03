@@ -147,7 +147,7 @@ def detail(sponsor_id: int):
     logo_path = _bal_logo_path()
     total = sponsor.total_invitations
     invitation_qrs = [
-        (inv, generate_qr_data_url(inv.token, number=inv.number, total=total, logo_path=logo_path))
+        (inv, generate_qr_data_url(inv.token, number=inv.number, total=total, logo_path=logo_path, with_conso=inv.with_conso))
         for inv in sponsor.invitations
     ]
     return render_template(
@@ -209,6 +209,7 @@ def qr_png(sponsor_id: int, invitation_id: int):
         number=invitation.number,
         total=sponsor.total_invitations,
         logo_path=_bal_logo_path(),
+        with_conso=invitation.with_conso,
     )
     return Response(png, mimetype="image/png")
 
@@ -224,7 +225,7 @@ def qr_zip(sponsor_id: int):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for inv in sponsor.invitations:
             png = generate_qr_png(
-                inv.token, number=inv.number, total=total, logo_path=logo_path
+                inv.token, number=inv.number, total=total, logo_path=logo_path, with_conso=inv.with_conso
             )
             filename = f"invitation-{inv.number:02d}.png"
             zf.writestr(filename, png)
@@ -304,12 +305,13 @@ def rename_invitation(sponsor_id: int, invitation_id: int):
     invitation = Invitation.query.filter_by(id=invitation_id, sponsor_id=sponsor_id).first_or_404()
     name = (request.form.get("guest_name") or "").strip()
     invitation.guest_name = name or None
+    invitation.with_conso = request.form.get("with_conso") == "1"
     log_action(
         "rename_invitation",
-        f"Invitation n°{invitation.number} du sponsor « {invitation.sponsor.company_name} » : nom = « {name or '—'} ».",
+        f"Invitation n°{invitation.number} du sponsor « {invitation.sponsor.company_name} » : nom = « {name or '—'} », conso = {'oui' if invitation.with_conso else 'non'}.",
         "sponsor",
         sponsor_id,
     )
     db.session.commit()
-    flash("Nom de l'invité mis à jour.", "success")
+    flash("Invitation mise à jour.", "success")
     return redirect(url_for("sponsors.detail", sponsor_id=sponsor_id))

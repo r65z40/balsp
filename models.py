@@ -103,6 +103,7 @@ class Invitation(db.Model):
         db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
     )
     guest_name = db.Column(db.String(200), nullable=True)
+    with_conso = db.Column(db.Boolean, nullable=False, default=False)
     scanned_at = db.Column(db.DateTime, nullable=True)
     scanned_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True

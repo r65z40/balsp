@@ -28,6 +28,7 @@ def _invitation_dict(inv: Invitation) -> dict:
         "id": inv.id,
         "number": inv.number,
         "guest_name": inv.guest_name,
+        "with_conso": inv.with_conso,
         "scanned": inv.scanned_at is not None,
         "scanned_at": inv.scanned_at.strftime("%d/%m/%Y %H:%M:%S") if inv.scanned_at else None,
         "scanned_by": inv.scanned_by.username if inv.scanned_by else None,

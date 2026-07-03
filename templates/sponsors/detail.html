@@ -87,10 +87,18 @@
                   <span class="badge text-bg-light text-dark ms-2">En attente</span>
                 {% endif %}
               </div>
-              <form method="post" action="{{ url_for('sponsors.rename_invitation', sponsor_id=sponsor.id, invitation_id=inv.id) }}" class="input-group input-group-sm mb-2">
+              <form method="post" action="{{ url_for('sponsors.rename_invitation', sponsor_id=sponsor.id, invitation_id=inv.id) }}" class="mb-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="text" name="guest_name" class="form-control" value="{{ inv.guest_name or '' }}" placeholder="Nom de l'invité (facultatif)">
-                <button class="btn btn-outline-primary" type="submit">Enregistrer</button>
+                <div class="input-group input-group-sm mb-1">
+                  <input type="text" name="guest_name" class="form-control" value="{{ inv.guest_name or '' }}" placeholder="Nom de l'invité (facultatif)">
+                  <button class="btn btn-outline-primary" type="submit">Enregistrer</button>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="with_conso" value="1" id="conso-{{ inv.id }}" {% if inv.with_conso %}checked{% endif %} onchange="this.form.submit()">
+                  <label class="form-check-label small {% if inv.with_conso %}fw-bold text-warning{% else %}text-muted{% endif %}" for="conso-{{ inv.id }}">
+                    {% if inv.with_conso %}Avec consommation{% else %}Sans consommation{% endif %}
+                  </label>
+                </div>
               </form>
               <div class="small">
                 <a href="{{ url_for('sponsors.qr_png', sponsor_id=sponsor.id, invitation_id=inv.id) }}" download="invitation-{{ inv.number }}.png" class="text-decoration-none">

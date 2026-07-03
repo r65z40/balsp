@@ -61,6 +61,19 @@ def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
                 f'<div style="color:#555; font-size:14px; margin-top:4px;">'
                 f'Au nom de <strong>{inv.guest_name}</strong></div>'
             )
+        conso_block = ""
+        if inv.with_conso:
+            conso_block = (
+                '<div style="display:inline-block; background:#d4a017; color:#fff; '
+                'font-weight:bold; font-size:13px; padding:4px 12px; border-radius:4px; '
+                'margin-top:6px;">AVEC CONSOMMATION</div>'
+            )
+        else:
+            conso_block = (
+                '<div style="display:inline-block; background:#e0e0e0; color:#666; '
+                'font-size:12px; padding:3px 10px; border-radius:4px; '
+                'margin-top:6px;">Sans consommation</div>'
+            )
         parts.append(
             f'<div style="display:inline-block; margin:12px; text-align:center; '
             f'vertical-align:top;">'
@@ -68,6 +81,7 @@ def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
             f'style="max-width:240px; height:auto; border:1px solid #eee; padding:6px; '
             f'background:#fff;">'
             f'{name_block}'
+            f'{conso_block}'
             f'</div>'
         )
     return (
@@ -190,6 +204,7 @@ def send_invitation_email(
             number=inv.number,
             total=total,
             logo_path=logo_path,
+            with_conso=inv.with_conso,
         )
         html_part.add_related(
             qr_png,
