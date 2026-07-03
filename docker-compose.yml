@@ -17,13 +17,7 @@ services:
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:5050}
       - GUNICORN_WORKERS=2
       - ENABLE_SSL=${ENABLE_SSL:-0}
-    networks:
-      - comet_default
 
 volumes:
   balsp_data:
   balsp_logos:
-
-networks:
-  comet_default:
-    external: true
