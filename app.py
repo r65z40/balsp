@@ -288,20 +288,27 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         else:
             click.echo("Table 'invitations' déjà présente.")
 
-        # Colonne with_conso sur invitations
+        # Migration with_conso → invitation_type sur invitations
         if "invitations" in inspector.get_table_names():
             inv_cols = {c["name"] for c in inspector.get_columns("invitations")}
-            if "with_conso" not in inv_cols:
+            if "invitation_type" not in inv_cols:
                 db.session.execute(
                     text(
                         "ALTER TABLE invitations "
-                        "ADD COLUMN with_conso BOOLEAN NOT NULL DEFAULT 0"
+                        "ADD COLUMN invitation_type VARCHAR(20) NOT NULL DEFAULT 'SANS_CONSO'"
                     )
                 )
+                if "with_conso" in inv_cols:
+                    db.session.execute(
+                        text(
+                            "UPDATE invitations SET invitation_type = 'AVEC_CONSO' "
+                            "WHERE with_conso = 1"
+                        )
+                    )
                 db.session.commit()
-                click.echo("Colonne 'with_conso' ajoutée à invitations.")
+                click.echo("Colonne 'invitation_type' ajoutée à invitations.")
             else:
-                click.echo("Colonne 'with_conso' déjà présente sur invitations.")
+                click.echo("Colonne 'invitation_type' déjà présente sur invitations.")
 
         # Mise à jour du template d'email : remplacer l'ancien pattern
         # <img src="cid:${qr_cid}"> par ${qr_codes} (bloc multi-QR).

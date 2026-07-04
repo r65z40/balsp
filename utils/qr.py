@@ -51,12 +51,18 @@ def _overlay_logo(qr_img: Image.Image, logo_path: str) -> Image.Image:
     return qr_img
 
 
+_BADGE_CONFIG = {
+    "AVEC_CONSO": {"text": "AVEC CONSOMMATION", "fill": "#d4a017"},
+    "SPONSOR_EXCLUSIF": {"text": "SPONSOR EXCLUSIF", "fill": "#8b0000"},
+}
+
+
 def _build_qr_image(
     data: str,
     number: Optional[int] = None,
     total: Optional[int] = None,
     logo_path: Optional[str] = None,
-    with_conso: bool = False,
+    invitation_type_name: Optional[str] = None,
 ) -> Image.Image:
     """Construit l'image PIL du QR code avec logo et numéro."""
     qr = qrcode.QRCode(
@@ -73,9 +79,10 @@ def _build_qr_image(
         img = _overlay_logo(img, logo_path)
 
     if number is not None:
-        conso_height = 50 if with_conso else 0
+        badge_cfg = _BADGE_CONFIG.get(invitation_type_name)
+        badge_height = 50 if badge_cfg else 0
         label_height = 80
-        canvas = Image.new("RGB", (img.size[0], img.size[1] + label_height + conso_height), "white")
+        canvas = Image.new("RGB", (img.size[0], img.size[1] + label_height + badge_height), "white")
         canvas.paste(img, (0, 0))
 
         draw = ImageDraw.Draw(canvas)
@@ -98,25 +105,25 @@ def _build_qr_image(
             font=font,
         )
 
-        if with_conso:
-            conso_font = _load_font(36)
-            conso_text = "AVEC CONSOMMATION"
+        if badge_cfg:
+            badge_font = _load_font(36)
+            badge_text = badge_cfg["text"]
             try:
-                bbox = draw.textbbox((0, 0), conso_text, font=conso_font)
+                bbox = draw.textbbox((0, 0), badge_text, font=badge_font)
                 cw = bbox[2] - bbox[0]
                 ch = bbox[3] - bbox[1]
             except Exception:
-                cw, ch = draw.textsize(conso_text, font=conso_font)
+                cw, ch = draw.textsize(badge_text, font=badge_font)
             pad = 8
             rx = (canvas.size[0] - cw) // 2 - pad
-            ry = img.size[1] + label_height + (conso_height - ch) // 2 - pad // 2
+            ry = img.size[1] + label_height + (badge_height - ch) // 2 - pad // 2
             draw.rounded_rectangle(
                 [rx, ry, rx + cw + pad * 2, ry + ch + pad],
-                radius=8, fill="#d4a017",
+                radius=8, fill=badge_cfg["fill"],
             )
             draw.text(
                 ((canvas.size[0] - cw) // 2, ry + pad // 2),
-                conso_text, fill="#ffffff", font=conso_font,
+                badge_text, fill="#ffffff", font=badge_font,
             )
 
         img = canvas
@@ -129,10 +136,10 @@ def generate_qr_png(
     number: Optional[int] = None,
     total: Optional[int] = None,
     logo_path: Optional[str] = None,
-    with_conso: bool = False,
+    invitation_type_name: Optional[str] = None,
 ) -> bytes:
     """Génère un QR code PNG (bytes) avec logo optionnel et numéro."""
-    img = _build_qr_image(data, number=number, total=total, logo_path=logo_path, with_conso=with_conso)
+    img = _build_qr_image(data, number=number, total=total, logo_path=logo_path, invitation_type_name=invitation_type_name)
     buf = BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -143,9 +150,9 @@ def generate_qr_data_url(
     number: Optional[int] = None,
     total: Optional[int] = None,
     logo_path: Optional[str] = None,
-    with_conso: bool = False,
+    invitation_type_name: Optional[str] = None,
 ) -> str:
     """Retourne le QR code encodé en data URL (pour affichage inline HTML)."""
-    png = generate_qr_png(data, number=number, total=total, logo_path=logo_path, with_conso=with_conso)
+    png = generate_qr_png(data, number=number, total=total, logo_path=logo_path, invitation_type_name=invitation_type_name)
     b64 = base64.b64encode(png).decode()
     return f"data:image/png;base64,{b64}"

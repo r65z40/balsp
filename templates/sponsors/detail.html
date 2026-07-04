@@ -93,11 +93,17 @@
                   <input type="text" name="guest_name" class="form-control" value="{{ inv.guest_name or '' }}" placeholder="Nom de l'invité (facultatif)">
                   <button class="btn btn-outline-primary" type="submit">Enregistrer</button>
                 </div>
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" name="with_conso" value="1" id="conso-{{ inv.id }}" {% if inv.with_conso %}checked{% endif %} onchange="this.form.submit()">
-                  <label class="form-check-label small {% if inv.with_conso %}fw-bold text-warning{% else %}text-muted{% endif %}" for="conso-{{ inv.id }}">
-                    {% if inv.with_conso %}Avec consommation{% else %}Sans consommation{% endif %}
-                  </label>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                  <select name="invitation_type" class="form-select form-select-sm" style="max-width: 200px;" onchange="this.form.submit()">
+                    <option value="SANS_CONSO" {% if inv.invitation_type.name == 'SANS_CONSO' %}selected{% endif %}>Sans consommation</option>
+                    <option value="AVEC_CONSO" {% if inv.invitation_type.name == 'AVEC_CONSO' %}selected{% endif %}>Avec consommation</option>
+                    <option value="SPONSOR_EXCLUSIF" {% if inv.invitation_type.name == 'SPONSOR_EXCLUSIF' %}selected{% endif %}>Sponsor exclusif</option>
+                  </select>
+                  {% if inv.invitation_type.name == 'SPONSOR_EXCLUSIF' %}
+                    <span class="badge bg-danger text-white">Exclusif</span>
+                  {% elif inv.invitation_type.name == 'AVEC_CONSO' %}
+                    <span class="badge bg-warning text-dark">Conso</span>
+                  {% endif %}
                 </div>
               </form>
               <div class="small">

@@ -51,44 +51,76 @@ def _strip_html(html: str) -> str:
     return text.strip()
 
 
-def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
-    """Construit le bloc HTML contenant toutes les images QR inline."""
-    parts = []
-    for inv, cid in zip(invitations, cids):
-        name_block = ""
-        if inv.guest_name:
-            name_block = (
-                f'<div style="color:#555; font-size:14px; margin-top:4px;">'
-                f'Au nom de <strong>{inv.guest_name}</strong></div>'
-            )
-        conso_block = ""
-        if inv.with_conso:
-            conso_block = (
-                '<div style="display:inline-block; background:#d4a017; color:#fff; '
-                'font-weight:bold; font-size:13px; padding:4px 12px; border-radius:4px; '
-                'margin-top:6px;">AVEC CONSOMMATION</div>'
-            )
-        else:
-            conso_block = (
-                '<div style="display:inline-block; background:#e0e0e0; color:#666; '
-                'font-size:12px; padding:3px 10px; border-radius:4px; '
-                'margin-top:6px;">Sans consommation</div>'
-            )
-        parts.append(
-            f'<div style="display:inline-block; margin:12px; text-align:center; '
-            f'vertical-align:top;">'
-            f'<img src="cid:{cid}" alt="QR invitation {inv.number}" '
-            f'style="max-width:240px; height:auto; border:1px solid #eee; padding:6px; '
-            f'background:#fff;">'
-            f'{name_block}'
-            f'{conso_block}'
-            f'</div>'
+def _invitation_type_badge(inv: Invitation) -> str:
+    inv_type = inv.invitation_type.name if inv.invitation_type else "SANS_CONSO"
+    if inv_type == "SPONSOR_EXCLUSIF":
+        return (
+            '<div style="display:inline-block; background:#8b0000; color:#fff; '
+            'font-weight:bold; font-size:13px; padding:4px 12px; border-radius:4px; '
+            'margin-top:6px;">SPONSOR EXCLUSIF</div>'
+        )
+    if inv_type == "AVEC_CONSO":
+        return (
+            '<div style="display:inline-block; background:#d4a017; color:#fff; '
+            'font-weight:bold; font-size:13px; padding:4px 12px; border-radius:4px; '
+            'margin-top:6px;">AVEC CONSOMMATION</div>'
         )
     return (
-        '<div style="text-align:center; margin:25px 0;">'
-        + "".join(parts)
-        + "</div>"
+        '<div style="display:inline-block; background:#e0e0e0; color:#666; '
+        'font-size:12px; padding:3px 10px; border-radius:4px; '
+        'margin-top:6px;">Sans consommation</div>'
     )
+
+
+def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
+    """Construit le bloc HTML contenant toutes les images QR inline, groupées par type."""
+    inv_cid_pairs = list(zip(invitations, cids))
+
+    exclusif = [(inv, cid) for inv, cid in inv_cid_pairs if inv.invitation_type.name == "SPONSOR_EXCLUSIF"]
+    autres = [(inv, cid) for inv, cid in inv_cid_pairs if inv.invitation_type.name != "SPONSOR_EXCLUSIF"]
+
+    sections = []
+
+    if exclusif:
+        label = "Vos invitations entreprise" if autres else ""
+        sections.append((label, exclusif))
+    if autres:
+        label = "Invitations pour vos clients" if exclusif else ""
+        sections.append((label, autres))
+
+    html_parts = []
+    for section_label, pairs in sections:
+        if section_label:
+            html_parts.append(
+                f'<h3 style="color:#8b0000; font-size:18px; margin:20px 0 10px; '
+                f'border-bottom:2px solid #8b0000; padding-bottom:6px;">{section_label}</h3>'
+            )
+        cards = []
+        for inv, cid in pairs:
+            name_block = ""
+            if inv.guest_name:
+                name_block = (
+                    f'<div style="color:#555; font-size:14px; margin-top:4px;">'
+                    f'Au nom de <strong>{inv.guest_name}</strong></div>'
+                )
+            type_badge = _invitation_type_badge(inv)
+            cards.append(
+                f'<div style="display:inline-block; margin:12px; text-align:center; '
+                f'vertical-align:top;">'
+                f'<img src="cid:{cid}" alt="QR invitation {inv.number}" '
+                f'style="max-width:240px; height:auto; border:1px solid #eee; padding:6px; '
+                f'background:#fff;">'
+                f'{name_block}'
+                f'{type_badge}'
+                f'</div>'
+            )
+        html_parts.append(
+            '<div style="text-align:center; margin:10px 0;">'
+            + "".join(cards)
+            + "</div>"
+        )
+
+    return '<div style="margin:25px 0;">' + "".join(html_parts) + "</div>"
 
 
 def build_context(
@@ -204,7 +236,7 @@ def send_invitation_email(
             number=inv.number,
             total=total,
             logo_path=logo_path,
-            with_conso=inv.with_conso,
+            invitation_type_name=inv.invitation_type.name,
         )
         html_part.add_related(
             qr_png,

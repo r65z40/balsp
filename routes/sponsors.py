@@ -24,7 +24,7 @@ from werkzeug.utils import secure_filename
 
 from extensions import db, log_action
 from forms import SponsorForm
-from models import EmailTemplate, Invitation, SmtpConfig, Sponsor, Tier
+from models import EmailTemplate, Invitation, InvitationType, SmtpConfig, Sponsor, Tier
 from utils.mailer import SmtpSettings, send_invitation_email
 from utils.qr import generate_qr_data_url, generate_qr_png
 from utils.tiers import compute_invitations, tier_from_amount
@@ -74,9 +74,12 @@ def _sync_invitations(sponsor: Sponsor) -> None:
     target = sponsor.total_invitations
 
     if len(current) < target:
-        # Créer les invitations manquantes
         for n in range(len(current) + 1, target + 1):
-            sponsor.invitations.append(Invitation(number=n))
+            if sponsor.tier == Tier.EXCLUSIVE and n <= 6:
+                inv_type = InvitationType.SPONSOR_EXCLUSIF
+            else:
+                inv_type = InvitationType.SANS_CONSO
+            sponsor.invitations.append(Invitation(number=n, invitation_type=inv_type))
     elif len(current) > target:
         # Supprimer les invitations en trop (par numéro décroissant)
         to_remove = current[target:]
@@ -147,7 +150,7 @@ def detail(sponsor_id: int):
     logo_path = _bal_logo_path()
     total = sponsor.total_invitations
     invitation_qrs = [
-        (inv, generate_qr_data_url(inv.token, number=inv.number, total=total, logo_path=logo_path, with_conso=inv.with_conso))
+        (inv, generate_qr_data_url(inv.token, number=inv.number, total=total, logo_path=logo_path, invitation_type_name=inv.invitation_type.name))
         for inv in sponsor.invitations
     ]
     return render_template(
@@ -209,7 +212,7 @@ def qr_png(sponsor_id: int, invitation_id: int):
         number=invitation.number,
         total=sponsor.total_invitations,
         logo_path=_bal_logo_path(),
-        with_conso=invitation.with_conso,
+        invitation_type_name=invitation.invitation_type.name,
     )
     return Response(png, mimetype="image/png")
 
@@ -225,7 +228,7 @@ def qr_zip(sponsor_id: int):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for inv in sponsor.invitations:
             png = generate_qr_png(
-                inv.token, number=inv.number, total=total, logo_path=logo_path, with_conso=inv.with_conso
+                inv.token, number=inv.number, total=total, logo_path=logo_path, invitation_type_name=inv.invitation_type.name
             )
             filename = f"invitation-{inv.number:02d}.png"
             zf.writestr(filename, png)
@@ -305,10 +308,14 @@ def rename_invitation(sponsor_id: int, invitation_id: int):
     invitation = Invitation.query.filter_by(id=invitation_id, sponsor_id=sponsor_id).first_or_404()
     name = (request.form.get("guest_name") or "").strip()
     invitation.guest_name = name or None
-    invitation.with_conso = request.form.get("with_conso") == "1"
+    inv_type_str = request.form.get("invitation_type", "SANS_CONSO")
+    try:
+        invitation.invitation_type = InvitationType[inv_type_str]
+    except KeyError:
+        invitation.invitation_type = InvitationType.SANS_CONSO
     log_action(
         "rename_invitation",
-        f"Invitation n°{invitation.number} du sponsor « {invitation.sponsor.company_name} » : nom = « {name or '—'} », conso = {'oui' if invitation.with_conso else 'non'}.",
+        f"Invitation n°{invitation.number} du sponsor « {invitation.sponsor.company_name} » : nom = « {name or '—'} », type = {invitation.invitation_type.label}.",
         "sponsor",
         sponsor_id,
     )

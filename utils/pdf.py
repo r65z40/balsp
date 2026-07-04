@@ -172,21 +172,26 @@ def generate_invitations_pdf(
                 pdf.set_text_color(80, 80, 80)
                 pdf.cell(0, 6, pdf.safe_text(f"Au nom de : {inv.guest_name}"), align="C", new_x="LMARGIN", new_y="NEXT")
 
-            # Badge conso
+            # Badge type d'invitation
             pdf.set_font(pdf.font_family_name, "B", 11)
-            if inv.with_conso:
+            inv_type = inv.invitation_type.name if inv.invitation_type else "SANS_CONSO"
+            if inv_type == "SPONSOR_EXCLUSIF":
+                pdf.set_fill_color(139, 0, 0)
+                pdf.set_text_color(255, 255, 255)
+                type_label = "SPONSOR EXCLUSIF"
+            elif inv_type == "AVEC_CONSO":
                 pdf.set_fill_color(212, 160, 23)
                 pdf.set_text_color(255, 255, 255)
-                conso_label = "AVEC CONSOMMATION"
+                type_label = "AVEC CONSOMMATION"
             else:
                 pdf.set_fill_color(220, 220, 220)
                 pdf.set_text_color(100, 100, 100)
-                conso_label = "Sans consommation"
-            label_w = pdf.get_string_width(pdf.safe_text(conso_label)) + 10
+                type_label = "Sans consommation"
+            label_w = pdf.get_string_width(pdf.safe_text(type_label)) + 10
             pdf.cell(0, 1, "", new_x="LMARGIN", new_y="NEXT")
             x_badge = (210 - label_w) / 2
             pdf.set_x(x_badge)
-            pdf.cell(label_w, 7, pdf.safe_text(conso_label), align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(label_w, 7, pdf.safe_text(type_label), align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
 
             pdf.set_text_color(0, 0, 0)
             pdf.ln(6)

@@ -11,6 +11,16 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db
 
 
+class InvitationType(enum.Enum):
+    SANS_CONSO = "Sans consommation"
+    AVEC_CONSO = "Avec consommation"
+    SPONSOR_EXCLUSIF = "Sponsor exclusif"
+
+    @property
+    def label(self) -> str:
+        return self.value
+
+
 class Tier(enum.Enum):
     UNDER_250 = "≤ 250 €"
     BETWEEN_251_500 = "251 – 500 €"
@@ -103,7 +113,9 @@ class Invitation(db.Model):
         db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
     )
     guest_name = db.Column(db.String(200), nullable=True)
-    with_conso = db.Column(db.Boolean, nullable=False, default=False)
+    invitation_type = db.Column(
+        db.Enum(InvitationType), nullable=False, default=InvitationType.SANS_CONSO
+    )
     scanned_at = db.Column(db.DateTime, nullable=True)
     scanned_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True

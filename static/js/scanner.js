@@ -29,7 +29,10 @@
   const currentName = document.getElementById('current-name');
   const currentStatus = document.getElementById('current-status');
   const currentConsoBadge = document.getElementById('current-conso-badge');
-  const consoAlert = document.getElementById('conso-alert');
+  const typeAlert = document.getElementById('type-alert');
+  const typeAlertInner = document.getElementById('type-alert-inner');
+  const typeAlertTitle = document.getElementById('type-alert-title');
+  const typeAlertSubtitle = document.getElementById('type-alert-subtitle');
   const invitationList = document.getElementById('invitation-list');
 
   // Check-in controls
@@ -37,6 +40,33 @@
   const btnCheckin = document.getElementById('btn-checkin');
   const btnUndo = document.getElementById('btn-undo');
   const btnRescan = document.getElementById('btn-rescan');
+
+  // --- Type badge config ---
+
+  const TYPE_CONFIG = {
+    SPONSOR_EXCLUSIF: {
+      badge: '<span class="badge bg-danger text-white">Exclusif</span>',
+      alertTitle: 'DONNER BRACELET',
+      alertSubtitle: 'Invitation sponsor exclusif',
+      alertClass: 'bracelet-flash',
+    },
+    AVEC_CONSO: {
+      badge: '<span class="badge bg-warning text-dark">Conso</span>',
+      alertTitle: 'DONNER JETONS',
+      alertSubtitle: 'Invitation avec consommation',
+      alertClass: 'jetons-flash',
+    },
+    SANS_CONSO: {
+      badge: '<span class="badge bg-light text-muted border">Sans conso</span>',
+      alertTitle: null,
+      alertSubtitle: null,
+      alertClass: null,
+    },
+  };
+
+  function getTypeConfig(invitationType) {
+    return TYPE_CONFIG[invitationType] || TYPE_CONFIG.SANS_CONSO;
+  }
 
   // --- Audio feedback ---
 
@@ -100,10 +130,27 @@
     resultMessage.textContent = '';
   }
 
+  function showTypeAlert(invitationType) {
+    const cfg = getTypeConfig(invitationType);
+    if (!cfg.alertTitle) {
+      typeAlert.classList.add('d-none');
+      return;
+    }
+    typeAlertInner.className = cfg.alertClass + ' text-center py-3 px-3 rounded-3';
+    typeAlertTitle.textContent = cfg.alertTitle;
+    typeAlertSubtitle.textContent = cfg.alertSubtitle;
+    typeAlert.classList.remove('d-none');
+    typeAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function hideTypeAlert() {
+    typeAlert.classList.add('d-none');
+  }
+
   function showScannerView() {
     scannerSection.classList.remove('d-none');
     resultSection.classList.add('d-none');
-    consoAlert.classList.add('d-none');
+    hideTypeAlert();
     currentToken = null;
     if (guestNameInput) guestNameInput.value = '';
     clearMessage();
@@ -125,9 +172,8 @@
       const badge = inv.scanned
         ? '<span class="badge text-bg-success">Arrivé</span>'
         : '<span class="badge text-bg-light text-dark">Attendu</span>';
-      const consoBadge = inv.with_conso
-        ? '<span class="badge bg-warning text-dark">Conso</span>'
-        : '<span class="badge bg-light text-muted border">Sans conso</span>';
+      const typeCfg = getTypeConfig(inv.invitation_type);
+      const typeBadge = typeCfg.badge;
       const nameHtml = inv.guest_name
         ? `<strong>${inv.guest_name}</strong>`
         : '<span class="text-muted">Sans nom</span>';
@@ -139,7 +185,7 @@
         <div class="d-flex justify-content-between align-items-start">
           <div>
             <div class="d-flex align-items-center gap-2 mb-1">
-              ${badge} ${consoBadge} <span>#${inv.number}</span> ${nameHtml}
+              ${badge} ${typeBadge} <span>#${inv.number}</span> ${nameHtml}
             </div>
             ${inv.scanned ? `<div class="ps-1">${timeHtml} ${scannedBy}</div>` : ''}
           </div>
@@ -159,36 +205,31 @@
   function renderCurrentInvitation(inv) {
     if (!inv) {
       currentCard.classList.add('d-none');
-      consoAlert.classList.add('d-none');
+      hideTypeAlert();
       return;
     }
     currentCard.classList.remove('d-none');
     currentNumber.textContent = inv.number;
     currentName.textContent = inv.guest_name || '';
 
-    if (inv.with_conso) {
-      currentConsoBadge.className = 'badge bg-warning text-dark ms-1';
-      currentConsoBadge.textContent = 'Conso';
-      currentConsoBadge.classList.remove('d-none');
-    } else {
-      currentConsoBadge.className = 'badge bg-light text-muted border ms-1';
-      currentConsoBadge.textContent = 'Sans conso';
-      currentConsoBadge.classList.remove('d-none');
-    }
+    const typeCfg = getTypeConfig(inv.invitation_type);
+    currentConsoBadge.innerHTML = typeCfg.badge;
+    currentConsoBadge.classList.remove('d-none');
 
     if (inv.scanned) {
       currentStatus.className = 'badge text-bg-success';
       currentStatus.textContent = 'Déjà pointée';
       btnCheckin.disabled = true;
       btnUndo.classList.remove('d-none');
-      consoAlert.classList.add('d-none');
     } else {
       currentStatus.className = 'badge text-bg-warning text-dark';
       currentStatus.textContent = 'En attente';
       btnCheckin.disabled = false;
       btnUndo.classList.add('d-none');
-      consoAlert.classList.add('d-none');
     }
+
+    // Show alert BEFORE check-in (always for special types)
+    showTypeAlert(inv.invitation_type);
   }
 
   function renderSponsor(sponsor) {
@@ -277,12 +318,8 @@
     showMessage('success', `✓ Invitation n°${data.invitation.number} pointée${name}.`);
     guestNameInput.value = '';
 
-    if (data.invitation.with_conso) {
-      consoAlert.classList.remove('d-none');
-      consoAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } else {
-      consoAlert.classList.add('d-none');
-    }
+    // Show alert AFTER check-in too
+    showTypeAlert(data.invitation.invitation_type);
   }
 
   async function undo() {
