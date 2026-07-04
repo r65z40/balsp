@@ -355,13 +355,35 @@
 
   // --- Camera ---
 
+  let resolvedCameraId = null;
+
+  async function acquireCamera() {
+    // Pre-acquire camera via getUserMedia() for kiosk compatibility.
+    // Then extract the deviceId and release the stream.
+    if (resolvedCameraId) return resolvedCameraId;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        resolvedCameraId = track.getSettings().deviceId || null;
+        track.stop();
+      }
+      stream.getTracks().forEach(t => t.stop());
+    } catch (_) {}
+    return resolvedCameraId;
+  }
+
   async function startScanner() {
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode('qr-reader');
     }
     try {
+      const cameraId = await acquireCamera();
+      const cameraConfig = cameraId || { facingMode: 'environment' };
       await html5QrCode.start(
-        { facingMode: 'environment' },
+        cameraConfig,
         { fps: 10, qrbox: { width: 260, height: 260 } },
         async (decodedText) => {
           await html5QrCode.pause(true);
