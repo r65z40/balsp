@@ -355,35 +355,89 @@
 
   // --- Camera ---
 
-  let resolvedCameraId = null;
+  let videoStream = null;
+  let videoEl = null;
+  let scanTimer = null;
+  let barcodeDetector = null;
+  const useNative = 'BarcodeDetector' in window;
 
-  async function acquireCamera() {
-    // Pre-acquire camera via getUserMedia() for kiosk compatibility.
-    // Then extract the deviceId and release the stream.
-    if (resolvedCameraId) return resolvedCameraId;
+  async function decodeFrame() {
+    if (!videoEl || videoEl.readyState < videoEl.HAVE_ENOUGH_DATA) return null;
+    if (barcodeDetector) {
+      const results = await barcodeDetector.detect(videoEl);
+      return results.length ? results[0].rawValue : null;
+    }
+    return null;
+  }
+
+  async function scanLoop() {
+    if (!running) return;
     try {
+      const result = await decodeFrame();
+      if (result && running) {
+        running = false;
+        await verifyToken(result.trim());
+        return;
+      }
+    } catch (_) {}
+    if (running) {
+      scanTimer = setTimeout(scanLoop, 150);
+    }
+  }
+
+  async function startNativeScanner() {
+    try {
+      if (!barcodeDetector) {
+        barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
-      const track = stream.getVideoTracks()[0];
-      if (track) {
-        resolvedCameraId = track.getSettings().deviceId || null;
-        track.stop();
+      videoStream = stream;
+
+      const container = document.getElementById('qr-reader');
+      if (!videoEl) {
+        videoEl = document.createElement('video');
+        videoEl.setAttribute('playsinline', '');
+        videoEl.setAttribute('autoplay', '');
+        videoEl.muted = true;
+        videoEl.style.width = '100%';
+        videoEl.style.borderRadius = '8px';
       }
-      stream.getTracks().forEach(t => t.stop());
-    } catch (_) {}
-    return resolvedCameraId;
+      videoEl.srcObject = stream;
+      container.innerHTML = '';
+      container.appendChild(videoEl);
+
+      // Scan overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'scan-overlay';
+      container.style.position = 'relative';
+      container.appendChild(overlay);
+
+      await videoEl.play();
+      running = true;
+      btnToggle.textContent = 'Arrêter';
+      scanLoop();
+    } catch (err) {
+      alert('Impossible d\'accéder à la caméra : ' + err);
+    }
   }
 
-  async function startScanner() {
+  function stopNativeScanner() {
+    running = false;
+    if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+    if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+    if (videoEl) { videoEl.srcObject = null; }
+    btnToggle.textContent = 'Démarrer';
+  }
+
+  async function startLegacyScanner() {
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode('qr-reader');
     }
     try {
-      const cameraId = await acquireCamera();
-      const cameraConfig = cameraId || { facingMode: 'environment' };
       await html5QrCode.start(
-        cameraConfig,
+        { facingMode: 'environment' },
         { fps: 10, qrbox: { width: 260, height: 260 } },
         async (decodedText) => {
           await html5QrCode.pause(true);
@@ -398,14 +452,22 @@
     }
   }
 
-  async function stopScanner() {
+  async function stopLegacyScanner() {
     if (html5QrCode && running) {
-      try {
-        await html5QrCode.stop();
-      } catch (_) {}
+      try { await html5QrCode.stop(); } catch (_) {}
       running = false;
       btnToggle.textContent = 'Démarrer';
     }
+  }
+
+  async function startScanner() {
+    if (useNative) return startNativeScanner();
+    return startLegacyScanner();
+  }
+
+  async function stopScanner() {
+    if (useNative) return stopNativeScanner();
+    return stopLegacyScanner();
   }
 
   // --- Event listeners ---
