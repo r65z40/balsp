@@ -14,6 +14,7 @@ from flask import current_app
 
 from models import EmailTemplate, Invitation, SmtpConfig, Sponsor
 from utils.crypto import decrypt
+from utils.pdf import generate_invitations_pdf
 from utils.qr import generate_qr_png
 
 
@@ -267,6 +268,21 @@ def send_invitation_email(
             cid=f"<{cid}>",
             filename=f"invitation-{inv.number}.png",
         )
+
+    # PDF imprimable en pièce jointe
+    try:
+        pdf_bytes = generate_invitations_pdf(
+            sponsor, list(invitations), bal_logo_path=logo_path,
+        )
+        safe_name = sponsor.company_name.replace(" ", "-")
+        msg.add_attachment(
+            pdf_bytes,
+            maintype="application",
+            subtype="pdf",
+            filename=f"invitations-{safe_name}.pdf",
+        )
+    except Exception:
+        pass
 
     _send(smtp, msg)
 
