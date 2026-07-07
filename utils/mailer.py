@@ -27,6 +27,7 @@ class SmtpSettings:
     use_ssl: bool
     from_name: str
     from_email: str
+    admin_cc_email: str = ""
 
     @classmethod
     def from_db(cls, cfg: SmtpConfig) -> "SmtpSettings":
@@ -39,6 +40,7 @@ class SmtpSettings:
             use_ssl=cfg.use_ssl,
             from_name=cfg.from_name,
             from_email=cfg.from_email,
+            admin_cc_email=cfg.admin_cc_email or "",
         )
 
 
@@ -222,6 +224,8 @@ def send_invitation_email(
     msg["Subject"] = subject
     msg["From"] = formataddr((smtp.from_name, smtp.from_email))
     msg["To"] = recipient_override or sponsor.contact_email
+    if smtp.admin_cc_email and not recipient_override:
+        msg["Cc"] = smtp.admin_cc_email
 
     msg.set_content(body_text or "Veuillez ouvrir cet email en HTML.")
     msg.add_alternative(body_html, subtype="html")

@@ -67,6 +67,13 @@
           </div>
         </div>
 
+        <div class="mb-3">
+          {{ form.admin_cc_email.label(class="form-label") }}
+          {{ form.admin_cc_email(class="form-control", placeholder="admin@exemple.fr") }}
+          <div class="form-text">Si renseigné, cet email recevra une copie de chaque email envoyé aux sponsors.</div>
+          {% for err in form.admin_cc_email.errors %}<div class="text-danger small">{{ err }}</div>{% endfor %}
+        </div>
+
         <hr>
         <div class="row align-items-end">
           <div class="col-md-8 mb-3">

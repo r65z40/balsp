@@ -128,6 +128,10 @@ class SmtpConfigForm(FlaskForm):
     from_email = EmailField(
         "Email de l'expéditeur", validators=[DataRequired(), Email(), Length(max=200)]
     )
+    admin_cc_email = EmailField(
+        "Email administrateur en copie (CC)",
+        validators=[Optional(), Email(), Length(max=200)],
+    )
     submit = SubmitField("Enregistrer")
     test_recipient = EmailField(
         "Adresse de test", validators=[Optional(), Email(), Length(max=200)]

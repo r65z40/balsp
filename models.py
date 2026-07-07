@@ -157,6 +157,7 @@ class SmtpConfig(db.Model):
     use_ssl = db.Column(db.Boolean, nullable=False, default=False)
     from_name = db.Column(db.String(150), nullable=False, default="Bal des Pompiers d'Auxerre")
     from_email = db.Column(db.String(200), nullable=False)
+    admin_cc_email = db.Column(db.String(200), nullable=True)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )

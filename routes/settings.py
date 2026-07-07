@@ -8,7 +8,7 @@ from flask_login import login_required
 
 from extensions import admin_required, db, log_action
 from forms import BrandingForm, EmailTemplateForm, SmtpConfigForm
-from models import EmailTemplate, Invitation, SmtpConfig, Sponsor, Tier
+from models import EmailTemplate, Invitation, InvitationType, SmtpConfig, Sponsor, Tier
 from utils.crypto import encrypt
 from utils.defaults import DEFAULT_EMAIL_BODY, DEFAULT_EMAIL_SUBJECT
 from utils.mailer import (
@@ -66,6 +66,7 @@ def smtp():
         cfg.use_ssl = form.use_ssl.data
         cfg.from_name = form.from_name.data.strip()
         cfg.from_email = form.from_email.data.strip()
+        cfg.admin_cc_email = (form.admin_cc_email.data or "").strip() or None
         log_action("edit_smtp", "Configuration SMTP modifiée.")
         db.session.commit()
         flash("Configuration SMTP enregistrée.", "success")
@@ -75,20 +76,21 @@ def smtp():
 
 
 def _sample_sponsor() -> Sponsor:
-    """Sponsor factice (avec invitations) pour l'aperçu."""
+    """Sponsor factice (avec invitations) pour l'aperçu — montre les 3 types."""
     s = Sponsor(
         company_name="Entreprise Exemple",
         contact_name="Jean Dupont",
         contact_email="jean.dupont@exemple.fr",
         contact_phone="01 23 45 67 89",
-        tier=Tier.BETWEEN_501_999,
+        tier=Tier.EXCLUSIVE,
         amount=750,
-        total_invitations=3,
+        total_invitations=4,
     )
     s.invitations = [
-        Invitation(number=1, token="sample-token-1", guest_name="Jean Dupont"),
-        Invitation(number=2, token="sample-token-2", guest_name=None),
-        Invitation(number=3, token="sample-token-3", guest_name=None),
+        Invitation(number=1, token="sample-token-1", guest_name="Jean Dupont", invitation_type=InvitationType.SPONSOR_EXCLUSIF),
+        Invitation(number=2, token="sample-token-2", guest_name=None, invitation_type=InvitationType.SPONSOR_EXCLUSIF),
+        Invitation(number=3, token="sample-token-3", guest_name=None, invitation_type=InvitationType.AVEC_CONSO),
+        Invitation(number=4, token="sample-token-4", guest_name=None, invitation_type=InvitationType.SANS_CONSO),
     ]
     return s
 
@@ -116,6 +118,7 @@ def email_template():
             return redirect(url_for("settings.email_template"))
 
         if form.preview.data:
+            from utils.mailer import _invitation_type_badge
             from utils.qr import generate_qr_data_url
 
             sample = _sample_sponsor()
@@ -123,21 +126,46 @@ def email_template():
             if not os.path.exists(logo_path):
                 logo_path = None
             total = len(sample.invitations)
-            qr_imgs = []
-            for inv in sample.invitations:
-                data_url = generate_qr_data_url(
-                    inv.token, number=inv.number, total=total, logo_path=logo_path
+
+            inv_list = list(sample.invitations)
+            exclusif = [inv for inv in inv_list if inv.invitation_type == InvitationType.SPONSOR_EXCLUSIF]
+            autres = [inv for inv in inv_list if inv.invitation_type != InvitationType.SPONSOR_EXCLUSIF]
+
+            sections = []
+            if exclusif:
+                label = "Vos invitations entreprise" if autres else ""
+                sections.append((label, exclusif))
+            if autres:
+                label = "Invitations pour vos clients" if exclusif else ""
+                sections.append((label, autres))
+
+            html_parts = []
+            for section_label, invs in sections:
+                if section_label:
+                    html_parts.append(
+                        f'<h3 style="color:#8b0000;font-size:18px;margin:20px 0 10px;'
+                        f'border-bottom:2px solid #8b0000;padding-bottom:6px;">{section_label}</h3>'
+                    )
+                cards = []
+                for inv in invs:
+                    data_url = generate_qr_data_url(
+                        inv.token, number=inv.number, total=total, logo_path=logo_path,
+                        invitation_type_name=inv.invitation_type.name,
+                    )
+                    name_block = (
+                        f'<div style="color:#555;font-size:14px;">Au nom de <strong>{inv.guest_name}</strong></div>'
+                        if inv.guest_name else ""
+                    )
+                    type_badge = _invitation_type_badge(inv)
+                    cards.append(
+                        f'<div style="display:inline-block;margin:12px;text-align:center;vertical-align:top;">'
+                        f'<img src="{data_url}" style="max-width:240px;" alt="QR {inv.number}">'
+                        f'{name_block}{type_badge}</div>'
+                    )
+                html_parts.append(
+                    '<div style="text-align:center;margin:10px 0;">' + "".join(cards) + "</div>"
                 )
-                name_block = (
-                    f'<div style="color:#555;font-size:14px;">Au nom de <strong>{inv.guest_name}</strong></div>'
-                    if inv.guest_name else ""
-                )
-                qr_imgs.append(
-                    f'<div style="display:inline-block;margin:12px;text-align:center;vertical-align:top;">'
-                    f'<img src="{data_url}" style="max-width:240px;" alt="QR {inv.number}">'
-                    f'{name_block}</div>'
-                )
-            qr_html = '<div style="text-align:center;margin:25px 0;">' + "".join(qr_imgs) + "</div>"
+            qr_html = '<div style="margin:25px 0;">' + "".join(html_parts) + "</div>"
             context = build_context(sample, qr_codes_html=qr_html)
             preview_html = render_email_template(form.body_html.data, context)
             flash("Aperçu généré avec un sponsor fictif.", "info")

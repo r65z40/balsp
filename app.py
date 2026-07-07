@@ -310,6 +310,21 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             else:
                 click.echo("Colonne 'invitation_type' déjà présente sur invitations.")
 
+        # Colonne admin_cc_email sur smtp_config
+        if "smtp_config" in inspector.get_table_names():
+            smtp_cols = {c["name"] for c in inspector.get_columns("smtp_config")}
+            if "admin_cc_email" not in smtp_cols:
+                db.session.execute(
+                    text(
+                        "ALTER TABLE smtp_config "
+                        "ADD COLUMN admin_cc_email VARCHAR(200)"
+                    )
+                )
+                db.session.commit()
+                click.echo("Colonne 'admin_cc_email' ajoutée à smtp_config.")
+            else:
+                click.echo("Colonne 'admin_cc_email' déjà présente sur smtp_config.")
+
         # Mise à jour du template d'email : remplacer l'ancien pattern
         # <img src="cid:${qr_cid}"> par ${qr_codes} (bloc multi-QR).
         tpl = EmailTemplate.query.first()

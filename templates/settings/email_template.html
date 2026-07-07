@@ -60,7 +60,7 @@
           ('nb_invitations', 'Nombre d\'invitations'),
           ('tier', 'Tier / niveau de sponsoring'),
           ('montant', 'Montant en €'),
-          ('qr_cid', 'QR code (image inline)'),
+          ('qr_codes', 'QR codes avec badges (bloc HTML)'),
         ] %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
           <div>
@@ -73,9 +73,11 @@
       </ul>
     </div>
     <div class="alert alert-secondary mt-3 small">
-      Pour afficher le QR code dans le corps du mail :
+      Pour afficher tous les QR codes dans le corps du mail, utilisez :
       <br>
-      <code>&lt;img src="${qr_cid}" alt="QR code"&gt;</code>
+      <code>${qr_codes}</code>
+      <br>
+      <span class="text-muted">Les invitations sont automatiquement groupées par type (entreprise / clients) avec badges.</span>
     </div>
   </div>
 </div>
