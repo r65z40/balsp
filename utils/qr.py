@@ -80,49 +80,61 @@ def _build_qr_image(
 
     if number is not None:
         badge_cfg = _BADGE_CONFIG.get(invitation_type_name)
-        badge_height = 50 if badge_cfg else 0
+        badge_height = 60 if badge_cfg else 0
         label_height = 80
-        canvas = Image.new("RGB", (img.size[0], img.size[1] + label_height + badge_height), "white")
-        canvas.paste(img, (0, 0))
+        margin = 30
 
-        draw = ImageDraw.Draw(canvas)
         font = _load_font(48)
         if total:
             text = f"Invitation {number} / {total}"
         else:
             text = f"Invitation n°{number}"
+
+        # Measure all text widths to determine canvas width
+        tmp_img = Image.new("RGB", (1, 1))
+        tmp_draw = ImageDraw.Draw(tmp_img)
         try:
-            bbox = draw.textbbox((0, 0), text, font=font)
+            bbox = tmp_draw.textbbox((0, 0), text, font=font)
             text_w = bbox[2] - bbox[0]
             text_h = bbox[3] - bbox[1]
         except Exception:
-            text_w, text_h = draw.textsize(text, font=font)
+            text_w, text_h = tmp_draw.textsize(text, font=font)
 
+        needed_w = text_w + margin * 2
+        badge_pad = 12
+        cw, ch = 0, 0
+        if badge_cfg:
+            badge_font = _load_font(36)
+            badge_text = badge_cfg["text"]
+            try:
+                bbox = tmp_draw.textbbox((0, 0), badge_text, font=badge_font)
+                cw = bbox[2] - bbox[0]
+                ch = bbox[3] - bbox[1]
+            except Exception:
+                cw, ch = tmp_draw.textsize(badge_text, font=badge_font)
+            needed_w = max(needed_w, cw + badge_pad * 2 + margin * 2)
+
+        canvas_w = max(img.size[0], needed_w)
+        canvas = Image.new("RGB", (canvas_w, img.size[1] + label_height + badge_height), "white")
+        canvas.paste(img, ((canvas_w - img.size[0]) // 2, 0))
+
+        draw = ImageDraw.Draw(canvas)
         draw.text(
-            ((canvas.size[0] - text_w) // 2, img.size[1] + (label_height - text_h) // 2 - 4),
+            ((canvas_w - text_w) // 2, img.size[1] + (label_height - text_h) // 2 - 4),
             text,
             fill="#8b0000",
             font=font,
         )
 
         if badge_cfg:
-            badge_font = _load_font(36)
-            badge_text = badge_cfg["text"]
-            try:
-                bbox = draw.textbbox((0, 0), badge_text, font=badge_font)
-                cw = bbox[2] - bbox[0]
-                ch = bbox[3] - bbox[1]
-            except Exception:
-                cw, ch = draw.textsize(badge_text, font=badge_font)
-            pad = 8
-            rx = (canvas.size[0] - cw) // 2 - pad
-            ry = img.size[1] + label_height + (badge_height - ch) // 2 - pad // 2
+            rx = (canvas_w - cw) // 2 - badge_pad
+            ry = img.size[1] + label_height + (badge_height - ch) // 2 - badge_pad // 2
             draw.rounded_rectangle(
-                [rx, ry, rx + cw + pad * 2, ry + ch + pad],
+                [rx, ry, rx + cw + badge_pad * 2, ry + ch + badge_pad],
                 radius=8, fill=badge_cfg["fill"],
             )
             draw.text(
-                ((canvas.size[0] - cw) // 2, ry + pad // 2),
+                ((canvas_w - cw) // 2, ry + badge_pad // 2),
                 badge_text, fill="#ffffff", font=badge_font,
             )
 
