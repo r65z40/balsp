@@ -242,6 +242,40 @@ def qr_zip(sponsor_id: int):
     )
 
 
+@bp.route("/download/<token>")
+def public_qr_zip(token: str):
+    """Téléchargement public du zip QR via lien signé (envoyé par email)."""
+    from itsdangerous import BadSignature, URLSafeSerializer
+
+    s = URLSafeSerializer(current_app.secret_key)
+    try:
+        sponsor_id = s.loads(token, salt="qr-download")
+    except BadSignature:
+        abort(403)
+
+    sponsor = Sponsor.query.get_or_404(sponsor_id)
+    logo_path = _bal_logo_path()
+    total = sponsor.total_invitations
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for inv in sponsor.invitations:
+            png = generate_qr_png(
+                inv.token, number=inv.number, total=total, logo_path=logo_path,
+                invitation_type_name=inv.invitation_type.name,
+            )
+            filename = f"invitation-{inv.number:02d}.png"
+            zf.writestr(filename, png)
+    buf.seek(0)
+    safe_name = sponsor.company_name.replace(" ", "-")
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"qr-{safe_name}.zip",
+    )
+
+
 @bp.route("/<int:sponsor_id>/invitations/all.pdf")
 @login_required
 def qr_pdf(sponsor_id: int):

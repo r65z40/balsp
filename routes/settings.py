@@ -146,7 +146,6 @@ def email_template():
                         f'<h3 style="color:#8b0000;font-size:18px;margin:20px 0 10px;'
                         f'border-bottom:2px solid #8b0000;padding-bottom:6px;">{section_label}</h3>'
                     )
-                cards = []
                 for inv in invs:
                     data_url = generate_qr_data_url(
                         inv.token, number=inv.number, total=total, logo_path=logo_path,
@@ -157,14 +156,19 @@ def email_template():
                         if inv.guest_name else ""
                     )
                     type_badge = _invitation_type_badge(inv)
-                    cards.append(
-                        f'<div style="display:inline-block;margin:12px;text-align:center;vertical-align:top;">'
-                        f'<img src="{data_url}" style="max-width:240px;" alt="QR {inv.number}">'
+                    html_parts.append(
+                        f'<div style="text-align:center;margin:20px 0;padding:15px 0;'
+                        f'border-bottom:1px solid #eee;">'
+                        f'<img src="{data_url}" style="max-width:280px;display:block;margin:0 auto;" alt="QR {inv.number}">'
                         f'{name_block}{type_badge}</div>'
                     )
-                html_parts.append(
-                    '<div style="text-align:center;margin:10px 0;">' + "".join(cards) + "</div>"
-                )
+            html_parts.append(
+                '<div style="text-align:center;margin:25px 0;">'
+                '<a href="#" style="display:inline-block;background:#c8102e;color:#fff;'
+                'font-weight:bold;font-size:15px;padding:12px 30px;border-radius:6px;'
+                'text-decoration:none;">Télécharger tous les QR codes (.zip)</a>'
+                '</div>'
+            )
             qr_html = '<div style="margin:25px 0;">' + "".join(html_parts) + "</div>"
             context = build_context(sample, qr_codes_html=qr_html)
             preview_html = render_email_template(form.body_html.data, context)

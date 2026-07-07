@@ -74,8 +74,8 @@ def _invitation_type_badge(inv: Invitation) -> str:
     )
 
 
-def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
-    """Construit le bloc HTML contenant toutes les images QR inline, groupées par type."""
+def _build_qr_codes_html(invitations: list[Invitation], cids: list[str], download_url: str = "") -> str:
+    """Construit le bloc HTML contenant toutes les images QR, groupées par type (1 par ligne)."""
     inv_cid_pairs = list(zip(invitations, cids))
 
     exclusif = [(inv, cid) for inv, cid in inv_cid_pairs if inv.invitation_type.name == "SPONSOR_EXCLUSIF"]
@@ -97,7 +97,6 @@ def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
                 f'<h3 style="color:#8b0000; font-size:18px; margin:20px 0 10px; '
                 f'border-bottom:2px solid #8b0000; padding-bottom:6px;">{section_label}</h3>'
             )
-        cards = []
         for inv, cid in pairs:
             name_block = ""
             if inv.guest_name:
@@ -106,20 +105,24 @@ def _build_qr_codes_html(invitations: list[Invitation], cids: list[str]) -> str:
                     f'Au nom de <strong>{inv.guest_name}</strong></div>'
                 )
             type_badge = _invitation_type_badge(inv)
-            cards.append(
-                f'<div style="display:inline-block; margin:12px; text-align:center; '
-                f'vertical-align:top;">'
+            html_parts.append(
+                f'<div style="text-align:center; margin:20px 0; padding:15px 0; '
+                f'border-bottom:1px solid #eee;">'
                 f'<img src="cid:{cid}" alt="QR invitation {inv.number}" '
-                f'style="max-width:240px; height:auto; border:1px solid #eee; padding:6px; '
-                f'background:#fff;">'
+                f'style="max-width:280px; height:auto; border:1px solid #eee; padding:6px; '
+                f'background:#fff; display:block; margin:0 auto;">'
                 f'{name_block}'
                 f'{type_badge}'
                 f'</div>'
             )
+
+    if download_url:
         html_parts.append(
-            '<div style="text-align:center; margin:10px 0;">'
-            + "".join(cards)
-            + "</div>"
+            f'<div style="text-align:center; margin:25px 0;">'
+            f'<a href="{download_url}" style="display:inline-block; background:#c8102e; color:#fff; '
+            f'font-weight:bold; font-size:15px; padding:12px 30px; border-radius:6px; '
+            f'text-decoration:none;">Télécharger tous les QR codes (.zip)</a>'
+            f'</div>'
         )
 
     return '<div style="margin:25px 0;">' + "".join(html_parts) + "</div>"
@@ -200,6 +203,19 @@ def _bal_logo_path() -> Optional[str]:
         return None
 
 
+def _generate_download_url(sponsor: Sponsor) -> str:
+    """Génère une URL signée pour le téléchargement public du zip QR."""
+    try:
+        from itsdangerous import URLSafeSerializer
+        from flask import url_for as flask_url_for
+
+        s = URLSafeSerializer(current_app.secret_key)
+        token = s.dumps(sponsor.id, salt="qr-download")
+        return flask_url_for("sponsors.public_qr_zip", token=token, _external=True)
+    except Exception:
+        return ""
+
+
 def send_invitation_email(
     smtp: SmtpSettings,
     template: EmailTemplate,
@@ -211,9 +227,11 @@ def send_invitation_email(
     if invitations is None:
         invitations = list(sponsor.invitations)
 
+    download_url = _generate_download_url(sponsor) if sponsor.id else ""
+
     # Un CID distinct par invitation
     cids = [make_msgid(domain="balsp.local")[1:-1] for _ in invitations]
-    qr_html = _build_qr_codes_html(invitations, cids)
+    qr_html = _build_qr_codes_html(invitations, cids, download_url=download_url)
 
     context = build_context(sponsor, qr_codes_html=qr_html)
     subject = render_template(template.subject, context)
