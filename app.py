@@ -95,6 +95,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
         from models import AuditLog, Invitation
 
+        # Crée toutes les tables manquantes d'un coup
+        db.create_all()
+
         inspector = inspect(db.engine)
         existing_tables = inspector.get_table_names()
 
