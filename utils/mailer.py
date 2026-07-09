@@ -132,10 +132,11 @@ def _build_qr_codes_html(invitations: list[Invitation], cids: list[str], downloa
 def build_context(
     sponsor: Sponsor,
     qr_codes_html: str = "",
+    invitation: Optional[Invitation] = None,
 ) -> dict[str, str]:
     """Variables disponibles pour la substitution dans le template d'email."""
     montant = f"{sponsor.amount:.2f} €" if sponsor.amount is not None else "—"
-    return {
+    ctx = {
         "entreprise": sponsor.company_name or "",
         "contact": sponsor.contact_name or "",
         "email": sponsor.contact_email or "",
@@ -145,6 +146,11 @@ def build_context(
         "montant": montant,
         "qr_codes": qr_codes_html,
     }
+    if invitation:
+        ctx["numero_invitation"] = str(invitation.number)
+        ctx["nom_invite"] = invitation.guest_name or ""
+        ctx["type_invitation"] = invitation.invitation_type.label if invitation.invitation_type else ""
+    return ctx
 
 
 # Regex : ancien pattern <img src="${qr_cid}" ...> ou <img src="cid:${qr_cid}" ...>
@@ -236,7 +242,8 @@ def send_invitation_email(
 
     context = build_context(sponsor, qr_codes_html=qr_html)
     subject = render_template(template.subject, context)
-    body_html = render_template(template.body_html, context)
+    body_source = sponsor.custom_email_body if sponsor.custom_email_body else template.body_html
+    body_html = render_template(body_source, context)
     body_text = _strip_html(body_html)
 
     msg = EmailMessage()
@@ -285,6 +292,58 @@ def send_invitation_email(
         pass
 
     _send(smtp, msg)
+
+
+def send_individual_emails(
+    smtp: SmtpSettings,
+    template: EmailTemplate,
+    sponsor: Sponsor,
+    invitations: Optional[list[Invitation]] = None,
+    recipient_override: Optional[str] = None,
+) -> None:
+    """Envoie un email séparé par invitation, chacun avec son QR code."""
+    if invitations is None:
+        invitations = list(sponsor.invitations)
+
+    logo_path = _bal_logo_path()
+    body_source = sponsor.custom_email_body if sponsor.custom_email_body else template.body_html
+
+    for inv in invitations:
+        cid = make_msgid(domain="balsp.local")[1:-1]
+        qr_html = _build_qr_codes_html([inv], [cid])
+
+        context = build_context(sponsor, qr_codes_html=qr_html, invitation=inv)
+        subject = render_template(template.subject, context)
+        body_html = render_template(body_source, context)
+        body_text = _strip_html(body_html)
+
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = formataddr((smtp.from_name, smtp.from_email))
+        msg["To"] = recipient_override or sponsor.contact_email
+        if smtp.admin_cc_email and not recipient_override:
+            msg["Cc"] = smtp.admin_cc_email
+
+        msg.set_content(body_text or "Veuillez ouvrir cet email en HTML.")
+        msg.add_alternative(body_html, subtype="html")
+
+        html_part = msg.get_payload()[1]
+        qr_png = generate_qr_png(
+            inv.token,
+            number=inv.number,
+            total=len(invitations),
+            logo_path=logo_path,
+            invitation_type_name=inv.invitation_type.name,
+        )
+        html_part.add_related(
+            qr_png,
+            maintype="image",
+            subtype="png",
+            cid=f"<{cid}>",
+            filename=f"invitation-{inv.number}.png",
+        )
+
+        _send(smtp, msg)
 
 
 def send_simple_email(

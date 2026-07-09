@@ -70,6 +70,20 @@ class SponsorForm(FlaskForm):
         default=0,
     )
 
+    email_mode = SelectField(
+        "Mode d'envoi des emails",
+        choices=[
+            ("GROUPED", "Un seul email avec toutes les invitations"),
+            ("INDIVIDUAL", "Un email séparé par invitation"),
+        ],
+        default="GROUPED",
+    )
+    custom_email_body = TextAreaField(
+        "Message personnalisé (HTML)",
+        validators=[Optional()],
+        render_kw={"rows": 8, "style": "font-family: monospace; font-size: 0.85rem;"},
+    )
+
     submit = SubmitField("Enregistrer")
 
     def validate(self, extra_validators=None) -> bool:  # type: ignore[override]

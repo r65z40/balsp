@@ -24,8 +24,8 @@ from werkzeug.utils import secure_filename
 
 from extensions import db, log_action
 from forms import SponsorForm
-from models import EmailTemplate, Invitation, InvitationType, SmtpConfig, Sponsor, Tier
-from utils.mailer import SmtpSettings, send_invitation_email
+from models import EmailMode, EmailTemplate, Invitation, InvitationType, SmtpConfig, Sponsor, Tier
+from utils.mailer import SmtpSettings, send_individual_emails, send_invitation_email
 from utils.qr import generate_qr_data_url, generate_qr_png
 from utils.tiers import compute_invitations, tier_from_amount
 
@@ -114,6 +114,9 @@ def _apply_form_to_sponsor(form: SponsorForm, sponsor: Sponsor) -> None:
     sponsor.total_invitations = base + sponsor.bonus_invitations
     _sync_invitations(sponsor)
 
+    sponsor.email_mode = EmailMode[form.email_mode.data]
+    sponsor.custom_email_body = (form.custom_email_body.data or "").strip() or None
+
 
 @bp.route("/")
 @login_required
@@ -170,6 +173,8 @@ def edit(sponsor_id: int):
         form.custom_invitations.data = sponsor.custom_invitations
         form.amount.data = sponsor.amount
         form.bonus_invitations.data = sponsor.bonus_invitations
+        form.email_mode.data = sponsor.email_mode.name if sponsor.email_mode else "GROUPED"
+        form.custom_email_body.data = sponsor.custom_email_body
 
     if form.validate_on_submit():
         try:
@@ -320,16 +325,22 @@ def send_email(sponsor_id: int):
 
     try:
         smtp = SmtpSettings.from_db(smtp_cfg)
-        send_invitation_email(smtp, template, sponsor, invitations=list(sponsor.invitations))
+        invitations = list(sponsor.invitations)
+        if sponsor.email_mode == EmailMode.INDIVIDUAL:
+            send_individual_emails(smtp, template, sponsor, invitations=invitations)
+            msg_detail = f"{len(invitations)} email(s) individuels envoyés"
+        else:
+            send_invitation_email(smtp, template, sponsor, invitations=invitations)
+            msg_detail = f"{len(invitations)} QR codes"
         sponsor.email_sent_at = datetime.utcnow()
         log_action(
             "send_email",
-            f"Email envoyé à {sponsor.contact_email} ({len(sponsor.invitations)} QR codes).",
+            f"Email envoyé à {sponsor.contact_email} ({msg_detail}).",
             "sponsor",
             sponsor.id,
         )
         db.session.commit()
-        flash(f"Email envoyé à {sponsor.contact_email}.", "success")
+        flash(f"Email envoyé à {sponsor.contact_email} ({msg_detail}).", "success")
     except Exception as exc:  # noqa: BLE001
         current_app.logger.exception("Erreur d'envoi d'email")
         flash(f"Erreur lors de l'envoi : {exc}", "danger")

@@ -36,6 +36,18 @@
             {% endif %}
           </dd>
 
+          <dt class="col-sm-4">Mode d'envoi</dt>
+          <dd class="col-sm-8">
+            {% if sponsor.email_mode and sponsor.email_mode.name == 'INDIVIDUAL' %}
+              <span class="badge text-bg-info">Un email par invitation</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Un seul email</span>
+            {% endif %}
+            {% if sponsor.custom_email_body %}
+              <span class="badge text-bg-warning ms-1">Message personnalisé</span>
+            {% endif %}
+          </dd>
+
           <dt class="col-sm-4">Email envoyé</dt>
           <dd class="col-sm-8">
             {% if sponsor.email_sent_at %}
