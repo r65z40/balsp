@@ -36,7 +36,6 @@
   const invitationList = document.getElementById('invitation-list');
 
   // Check-in controls
-  const guestNameInput = document.getElementById('guest-name');
   const btnCheckin = document.getElementById('btn-checkin');
   const btnUndo = document.getElementById('btn-undo');
   const btnRescan = document.getElementById('btn-rescan');
@@ -152,7 +151,6 @@
     resultSection.classList.add('d-none');
     hideTypeAlert();
     currentToken = null;
-    if (guestNameInput) guestNameInput.value = '';
     clearMessage();
   }
 
@@ -210,7 +208,13 @@
     }
     currentCard.classList.remove('d-none');
     currentNumber.textContent = inv.number;
-    currentName.textContent = inv.guest_name || '';
+    const nameRow = document.getElementById('current-name-row');
+    if (inv.guest_name) {
+      currentName.textContent = inv.guest_name;
+      nameRow.classList.remove('d-none');
+    } else {
+      nameRow.classList.add('d-none');
+    }
 
     const typeCfg = getTypeConfig(inv.invitation_type);
     currentConsoBadge.innerHTML = typeCfg.badge;
@@ -296,11 +300,9 @@
 
   async function checkIn() {
     if (!currentToken) return;
-    const guestName = (guestNameInput.value || '').trim();
 
     const { ok, data } = await apiPost('/scan/check-in', {
       token: currentToken,
-      guest_name: guestName,
     });
     if (!ok || !data.ok) {
       feedbackError();
@@ -316,9 +318,7 @@
     renderCurrentInvitation(data.invitation);
     const name = data.invitation.guest_name ? ` (${data.invitation.guest_name})` : '';
     showMessage('success', `✓ Invitation n°${data.invitation.number} pointée${name}.`);
-    guestNameInput.value = '';
 
-    // Show alert AFTER check-in too
     showTypeAlert(data.invitation.invitation_type);
   }
 
