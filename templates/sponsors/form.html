@@ -87,17 +87,6 @@
         <hr>
         <h5>Email</h5>
 
-        <div class="row">
-          <div class="col-md-6 mb-3">
-            {{ form.email_mode.label(class="form-label") }}
-            {{ form.email_mode(class="form-select") }}
-            <div class="form-text">
-              <strong>Un seul email</strong> : toutes les invitations dans un email.<br>
-              <strong>Un email par invitation</strong> : un email distinct par QR code.
-            </div>
-          </div>
-        </div>
-
         <div class="mb-3">
           <div class="d-flex align-items-center mb-1">
             {{ form.custom_email_body.label(class="form-label mb-0") }}
@@ -106,11 +95,14 @@
             </button>
           </div>
           <div class="form-text mb-2">
-            Laissez vide pour utiliser le modèle global. Variables disponibles : <code>${entreprise}</code>, <code>${contact}</code>, <code>${nb_invitations}</code>, <code>${tier}</code>, <code>${montant}</code>, <code>${qr_codes}</code>.
-            En mode individuel : <code>${numero_invitation}</code>, <code>${nom_invite}</code>, <code>${type_invitation}</code>.
+            Laissez vide pour utiliser le modèle global. Variables : <code>${entreprise}</code>, <code>${contact}</code>, <code>${nb_invitations}</code>, <code>${tier}</code>, <code>${montant}</code>, <code>${qr_codes}</code>.
+            Pour les invitations avec email individuel : <code>${numero_invitation}</code>, <code>${nom_invite}</code>, <code>${type_invitation}</code>.
           </div>
           <div id="custom-body-wrapper" style="{% if not form.custom_email_body.data %}display:none{% endif %}">
             {{ form.custom_email_body(class="form-control") }}
+          </div>
+          <div class="form-text mt-1">
+            Les emails individuels par invitation se configurent sur la page de détail du sponsor, en renseignant un email sur chaque invitation.
           </div>
         </div>
 

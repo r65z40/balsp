@@ -223,20 +223,17 @@ def _generate_download_url(sponsor: Sponsor) -> str:
         return ""
 
 
-def send_invitation_email(
+def _send_grouped_email(
     smtp: SmtpSettings,
     template: EmailTemplate,
     sponsor: Sponsor,
-    invitations: Optional[list[Invitation]] = None,
+    invitations: list[Invitation],
+    recipient: str,
     recipient_override: Optional[str] = None,
 ) -> None:
-    """Envoie l'email d'invitation avec tous les QR codes inline."""
-    if invitations is None:
-        invitations = list(sponsor.invitations)
-
+    """Envoie un seul email avec plusieurs QR codes inline."""
     download_url = _generate_download_url(sponsor) if sponsor.id else ""
 
-    # Un CID distinct par invitation
     cids = [make_msgid(domain="balsp.local")[1:-1] for _ in invitations]
     qr_html = _build_qr_codes_html(invitations, cids, download_url=download_url)
 
@@ -249,14 +246,13 @@ def send_invitation_email(
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = formataddr((smtp.from_name, smtp.from_email))
-    msg["To"] = recipient_override or sponsor.contact_email
+    msg["To"] = recipient
     if smtp.admin_cc_email and not recipient_override:
         msg["Cc"] = smtp.admin_cc_email
 
     msg.set_content(body_text or "Veuillez ouvrir cet email en HTML.")
     msg.add_alternative(body_html, subtype="html")
 
-    # Attache chaque QR code en pièce jointe inline (CID)
     html_part = msg.get_payload()[1]
     logo_path = _bal_logo_path()
     total = len(invitations)
@@ -276,7 +272,6 @@ def send_invitation_email(
             filename=f"invitation-{inv.number}.png",
         )
 
-    # PDF imprimable en pièce jointe
     try:
         pdf_bytes = generate_invitations_pdf(
             sponsor, list(invitations), bal_logo_path=logo_path,
@@ -294,56 +289,102 @@ def send_invitation_email(
     _send(smtp, msg)
 
 
-def send_individual_emails(
+def _send_single_invitation_email(
+    smtp: SmtpSettings,
+    template: EmailTemplate,
+    sponsor: Sponsor,
+    inv: Invitation,
+    recipient: str,
+    total: int,
+) -> None:
+    """Envoie un email avec un seul QR code à un destinataire spécifique."""
+    cid = make_msgid(domain="balsp.local")[1:-1]
+    qr_html = _build_qr_codes_html([inv], [cid])
+
+    context = build_context(sponsor, qr_codes_html=qr_html, invitation=inv)
+    body_source = sponsor.custom_email_body if sponsor.custom_email_body else template.body_html
+    subject = render_template(template.subject, context)
+    body_html = render_template(body_source, context)
+    body_text = _strip_html(body_html)
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = formataddr((smtp.from_name, smtp.from_email))
+    msg["To"] = recipient
+    if smtp.admin_cc_email:
+        msg["Cc"] = smtp.admin_cc_email
+
+    msg.set_content(body_text or "Veuillez ouvrir cet email en HTML.")
+    msg.add_alternative(body_html, subtype="html")
+
+    html_part = msg.get_payload()[1]
+    logo_path = _bal_logo_path()
+    qr_png = generate_qr_png(
+        inv.token,
+        number=inv.number,
+        total=total,
+        logo_path=logo_path,
+        invitation_type_name=inv.invitation_type.name,
+    )
+    html_part.add_related(
+        qr_png,
+        maintype="image",
+        subtype="png",
+        cid=f"<{cid}>",
+        filename=f"invitation-{inv.number}.png",
+    )
+
+    _send(smtp, msg)
+
+
+def send_sponsor_emails(
+    smtp: SmtpSettings,
+    template: EmailTemplate,
+    sponsor: Sponsor,
+    invitations: Optional[list[Invitation]] = None,
+    recipient_override: Optional[str] = None,
+) -> int:
+    """Envoie les emails d'invitation en dispatchant selon guest_email.
+
+    - Invitations avec un guest_email : un email individuel par invitation
+    - Invitations sans guest_email : regroupées dans un seul email au sponsor
+    Retourne le nombre d'emails envoyés.
+    """
+    if invitations is None:
+        invitations = list(sponsor.invitations)
+
+    total = len(invitations)
+    sent = 0
+
+    individual = [inv for inv in invitations if inv.guest_email]
+    grouped = [inv for inv in invitations if not inv.guest_email]
+
+    for inv in individual:
+        recipient = recipient_override or inv.guest_email
+        _send_single_invitation_email(smtp, template, sponsor, inv, recipient, total)
+        sent += 1
+
+    if grouped:
+        recipient = recipient_override or sponsor.contact_email
+        _send_grouped_email(smtp, template, sponsor, grouped, recipient, recipient_override)
+        sent += 1
+
+    return sent
+
+
+def send_invitation_email(
     smtp: SmtpSettings,
     template: EmailTemplate,
     sponsor: Sponsor,
     invitations: Optional[list[Invitation]] = None,
     recipient_override: Optional[str] = None,
 ) -> None:
-    """Envoie un email séparé par invitation, chacun avec son QR code."""
+    """Envoie un email groupé (utilisé par les tests de template)."""
     if invitations is None:
         invitations = list(sponsor.invitations)
-
-    logo_path = _bal_logo_path()
-    body_source = sponsor.custom_email_body if sponsor.custom_email_body else template.body_html
-
-    for inv in invitations:
-        cid = make_msgid(domain="balsp.local")[1:-1]
-        qr_html = _build_qr_codes_html([inv], [cid])
-
-        context = build_context(sponsor, qr_codes_html=qr_html, invitation=inv)
-        subject = render_template(template.subject, context)
-        body_html = render_template(body_source, context)
-        body_text = _strip_html(body_html)
-
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = formataddr((smtp.from_name, smtp.from_email))
-        msg["To"] = recipient_override or sponsor.contact_email
-        if smtp.admin_cc_email and not recipient_override:
-            msg["Cc"] = smtp.admin_cc_email
-
-        msg.set_content(body_text or "Veuillez ouvrir cet email en HTML.")
-        msg.add_alternative(body_html, subtype="html")
-
-        html_part = msg.get_payload()[1]
-        qr_png = generate_qr_png(
-            inv.token,
-            number=inv.number,
-            total=len(invitations),
-            logo_path=logo_path,
-            invitation_type_name=inv.invitation_type.name,
-        )
-        html_part.add_related(
-            qr_png,
-            maintype="image",
-            subtype="png",
-            cid=f"<{cid}>",
-            filename=f"invitation-{inv.number}.png",
-        )
-
-        _send(smtp, msg)
+    _send_grouped_email(smtp, template, sponsor, invitations,
+                        recipient_override or sponsor.contact_email,
+                        recipient_override)
 
 
 def send_simple_email(

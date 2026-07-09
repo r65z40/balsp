@@ -325,20 +325,9 @@ def create_app(config_class: type[Config] = Config) -> Flask:
             else:
                 click.echo("Colonne 'admin_cc_email' déjà présente sur smtp_config.")
 
-        # Colonnes email_mode et custom_email_body sur sponsors
+        # Colonne custom_email_body sur sponsors
         if "sponsors" in inspector.get_table_names():
             sp_cols = {c["name"] for c in inspector.get_columns("sponsors")}
-            if "email_mode" not in sp_cols:
-                db.session.execute(
-                    text(
-                        "ALTER TABLE sponsors "
-                        "ADD COLUMN email_mode VARCHAR(20) NOT NULL DEFAULT 'GROUPED'"
-                    )
-                )
-                db.session.commit()
-                click.echo("Colonne 'email_mode' ajoutée à sponsors.")
-            else:
-                click.echo("Colonne 'email_mode' déjà présente sur sponsors.")
             if "custom_email_body" not in sp_cols:
                 db.session.execute(
                     text(
@@ -350,6 +339,21 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 click.echo("Colonne 'custom_email_body' ajoutée à sponsors.")
             else:
                 click.echo("Colonne 'custom_email_body' déjà présente sur sponsors.")
+
+        # Colonne guest_email sur invitations
+        if "invitations" in inspector.get_table_names():
+            inv_cols = {c["name"] for c in inspector.get_columns("invitations")}
+            if "guest_email" not in inv_cols:
+                db.session.execute(
+                    text(
+                        "ALTER TABLE invitations "
+                        "ADD COLUMN guest_email VARCHAR(200)"
+                    )
+                )
+                db.session.commit()
+                click.echo("Colonne 'guest_email' ajoutée à invitations.")
+            else:
+                click.echo("Colonne 'guest_email' déjà présente sur invitations.")
 
         # Mise à jour du template d'email : remplacer l'ancien pattern
         # <img src="cid:${qr_cid}"> par ${qr_codes} (bloc multi-QR).

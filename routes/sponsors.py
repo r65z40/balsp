@@ -24,8 +24,8 @@ from werkzeug.utils import secure_filename
 
 from extensions import db, log_action
 from forms import SponsorForm
-from models import EmailMode, EmailTemplate, Invitation, InvitationType, SmtpConfig, Sponsor, Tier
-from utils.mailer import SmtpSettings, send_individual_emails, send_invitation_email
+from models import EmailTemplate, Invitation, InvitationType, SmtpConfig, Sponsor, Tier
+from utils.mailer import SmtpSettings, send_sponsor_emails
 from utils.qr import generate_qr_data_url, generate_qr_png
 from utils.tiers import compute_invitations, tier_from_amount
 
@@ -114,7 +114,6 @@ def _apply_form_to_sponsor(form: SponsorForm, sponsor: Sponsor) -> None:
     sponsor.total_invitations = base + sponsor.bonus_invitations
     _sync_invitations(sponsor)
 
-    sponsor.email_mode = EmailMode[form.email_mode.data]
     sponsor.custom_email_body = (form.custom_email_body.data or "").strip() or None
 
 
@@ -173,7 +172,6 @@ def edit(sponsor_id: int):
         form.custom_invitations.data = sponsor.custom_invitations
         form.amount.data = sponsor.amount
         form.bonus_invitations.data = sponsor.bonus_invitations
-        form.email_mode.data = sponsor.email_mode.name if sponsor.email_mode else "GROUPED"
         form.custom_email_body.data = sponsor.custom_email_body
 
     if form.validate_on_submit():
@@ -326,21 +324,16 @@ def send_email(sponsor_id: int):
     try:
         smtp = SmtpSettings.from_db(smtp_cfg)
         invitations = list(sponsor.invitations)
-        if sponsor.email_mode == EmailMode.INDIVIDUAL:
-            send_individual_emails(smtp, template, sponsor, invitations=invitations)
-            msg_detail = f"{len(invitations)} email(s) individuels envoyés"
-        else:
-            send_invitation_email(smtp, template, sponsor, invitations=invitations)
-            msg_detail = f"{len(invitations)} QR codes"
+        sent_count = send_sponsor_emails(smtp, template, sponsor, invitations=invitations)
         sponsor.email_sent_at = datetime.utcnow()
         log_action(
             "send_email",
-            f"Email envoyé à {sponsor.contact_email} ({msg_detail}).",
+            f"{sent_count} email(s) envoyé(s) pour {sponsor.company_name} ({len(invitations)} invitation(s)).",
             "sponsor",
             sponsor.id,
         )
         db.session.commit()
-        flash(f"Email envoyé à {sponsor.contact_email} ({msg_detail}).", "success")
+        flash(f"{sent_count} email(s) envoyé(s).", "success")
     except Exception as exc:  # noqa: BLE001
         current_app.logger.exception("Erreur d'envoi d'email")
         flash(f"Erreur lors de l'envoi : {exc}", "danger")
@@ -353,6 +346,8 @@ def rename_invitation(sponsor_id: int, invitation_id: int):
     invitation = Invitation.query.filter_by(id=invitation_id, sponsor_id=sponsor_id).first_or_404()
     name = (request.form.get("guest_name") or "").strip()
     invitation.guest_name = name or None
+    email = (request.form.get("guest_email") or "").strip()
+    invitation.guest_email = email or None
     inv_type_str = request.form.get("invitation_type", "SANS_CONSO")
     try:
         invitation.invitation_type = InvitationType[inv_type_str]
@@ -360,7 +355,7 @@ def rename_invitation(sponsor_id: int, invitation_id: int):
         invitation.invitation_type = InvitationType.SANS_CONSO
     log_action(
         "rename_invitation",
-        f"Invitation n°{invitation.number} du sponsor « {invitation.sponsor.company_name} » : nom = « {name or '—'} », type = {invitation.invitation_type.label}.",
+        f"Invitation n°{invitation.number} du sponsor « {invitation.sponsor.company_name} » : nom = « {name or '—'} », email = « {email or '—'} », type = {invitation.invitation_type.label}.",
         "sponsor",
         sponsor_id,
     )

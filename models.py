@@ -11,15 +11,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db
 
 
-class EmailMode(enum.Enum):
-    GROUPED = "Un seul email (toutes les invitations)"
-    INDIVIDUAL = "Un email par invitation"
-
-    @property
-    def label(self) -> str:
-        return self.value
-
-
 class InvitationType(enum.Enum):
     SANS_CONSO = "Sans consommation"
     AVEC_CONSO = "Avec consommation"
@@ -87,9 +78,6 @@ class Sponsor(db.Model):
     bonus_invitations = db.Column(db.Integer, nullable=False, default=0)
     total_invitations = db.Column(db.Integer, nullable=False, default=0)
 
-    email_mode = db.Column(
-        db.Enum(EmailMode), nullable=False, default=EmailMode.GROUPED
-    )
     custom_email_body = db.Column(db.Text, nullable=True)
 
     email_sent_at = db.Column(db.DateTime, nullable=True)
@@ -127,6 +115,7 @@ class Invitation(db.Model):
         db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
     )
     guest_name = db.Column(db.String(200), nullable=True)
+    guest_email = db.Column(db.String(200), nullable=True)
     invitation_type = db.Column(
         db.Enum(InvitationType), nullable=False, default=InvitationType.SANS_CONSO
     )

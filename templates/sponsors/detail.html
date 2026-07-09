@@ -36,17 +36,12 @@
             {% endif %}
           </dd>
 
-          <dt class="col-sm-4">Mode d'envoi</dt>
+          {% if sponsor.custom_email_body %}
+          <dt class="col-sm-4">Email</dt>
           <dd class="col-sm-8">
-            {% if sponsor.email_mode and sponsor.email_mode.name == 'INDIVIDUAL' %}
-              <span class="badge text-bg-info">Un email par invitation</span>
-            {% else %}
-              <span class="badge text-bg-secondary">Un seul email</span>
-            {% endif %}
-            {% if sponsor.custom_email_body %}
-              <span class="badge text-bg-warning ms-1">Message personnalisé</span>
-            {% endif %}
+            <span class="badge text-bg-warning">Message personnalisé</span>
           </dd>
+          {% endif %}
 
           <dt class="col-sm-4">Email envoyé</dt>
           <dd class="col-sm-8">
@@ -103,8 +98,12 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="input-group input-group-sm mb-1">
                   <input type="text" name="guest_name" class="form-control" value="{{ inv.guest_name or '' }}" placeholder="Nom de l'invité (facultatif)">
+                  <input type="email" name="guest_email" class="form-control" value="{{ inv.guest_email or '' }}" placeholder="Email destinataire (facultatif)">
                   <button class="btn btn-outline-primary" type="submit">Enregistrer</button>
                 </div>
+                {% if inv.guest_email %}
+                  <div class="small text-info mt-1">QR envoyé individuellement à {{ inv.guest_email }}</div>
+                {% endif %}
                 <div class="d-flex align-items-center gap-2 mt-1">
                   <select name="invitation_type" class="form-select form-select-sm" style="max-width: 200px;" onchange="this.form.submit()">
                     <option value="SANS_CONSO" {% if inv.invitation_type.name == 'SANS_CONSO' %}selected{% endif %}>Sans consommation</option>

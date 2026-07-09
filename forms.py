@@ -70,14 +70,6 @@ class SponsorForm(FlaskForm):
         default=0,
     )
 
-    email_mode = SelectField(
-        "Mode d'envoi des emails",
-        choices=[
-            ("GROUPED", "Un seul email avec toutes les invitations"),
-            ("INDIVIDUAL", "Un email séparé par invitation"),
-        ],
-        default="GROUPED",
-    )
     custom_email_body = TextAreaField(
         "Message personnalisé (HTML)",
         validators=[Optional()],
