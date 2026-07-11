@@ -119,6 +119,7 @@ class Invitation(db.Model):
     invitation_type = db.Column(
         db.Enum(InvitationType), nullable=False, default=InvitationType.SANS_CONSO
     )
+    email_sent_at = db.Column(db.DateTime, nullable=True)
     scanned_at = db.Column(db.DateTime, nullable=True)
     scanned_by_user_id = db.Column(
         db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True

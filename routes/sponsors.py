@@ -325,7 +325,10 @@ def send_email(sponsor_id: int):
         smtp = SmtpSettings.from_db(smtp_cfg)
         invitations = list(sponsor.invitations)
         sent_count = send_sponsor_emails(smtp, template, sponsor, invitations=invitations)
-        sponsor.email_sent_at = datetime.utcnow()
+        now = datetime.utcnow()
+        sponsor.email_sent_at = now
+        for inv in invitations:
+            inv.email_sent_at = now
         log_action(
             "send_email",
             f"{sent_count} email(s) envoyé(s) pour {sponsor.company_name} ({len(invitations)} invitation(s)).",
@@ -362,3 +365,41 @@ def rename_invitation(sponsor_id: int, invitation_id: int):
     db.session.commit()
     flash("Invitation mise à jour.", "success")
     return redirect(url_for("sponsors.detail", sponsor_id=sponsor_id))
+
+
+@bp.route("/<int:sponsor_id>/invitations/<int:invitation_id>/send-email", methods=["POST"])
+@login_required
+def send_invitation_email_single(sponsor_id: int, invitation_id: int):
+    from utils.mailer import _send_single_invitation_email
+
+    invitation = Invitation.query.filter_by(id=invitation_id, sponsor_id=sponsor_id).first_or_404()
+    sponsor = invitation.sponsor
+
+    smtp_cfg = SmtpConfig.query.first()
+    if not smtp_cfg:
+        flash("Configuration SMTP manquante.", "danger")
+        return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
+
+    template = EmailTemplate.query.first()
+    if not template:
+        flash("Modèle d'email manquant.", "danger")
+        return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))
+
+    recipient = invitation.guest_email or sponsor.contact_email
+
+    try:
+        smtp = SmtpSettings.from_db(smtp_cfg)
+        _send_single_invitation_email(smtp, template, sponsor, invitation, recipient, sponsor.total_invitations)
+        invitation.email_sent_at = datetime.utcnow()
+        log_action(
+            "send_email",
+            f"Email invitation n°{invitation.number} envoyé à {recipient} ({sponsor.company_name}).",
+            "sponsor",
+            sponsor.id,
+        )
+        db.session.commit()
+        flash(f"Email envoyé à {recipient} (invitation n°{invitation.number}).", "success")
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.exception("Erreur d'envoi d'email individuel")
+        flash(f"Erreur lors de l'envoi : {exc}", "danger")
+    return redirect(url_for("sponsors.detail", sponsor_id=sponsor.id))

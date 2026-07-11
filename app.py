@@ -357,6 +357,17 @@ def create_app(config_class: type[Config] = Config) -> Flask:
                 click.echo("Colonne 'guest_email' ajoutée à invitations.")
             else:
                 click.echo("Colonne 'guest_email' déjà présente sur invitations.")
+            if "email_sent_at" not in inv_cols:
+                db.session.execute(
+                    text(
+                        "ALTER TABLE invitations "
+                        "ADD COLUMN email_sent_at DATETIME"
+                    )
+                )
+                db.session.commit()
+                click.echo("Colonne 'email_sent_at' ajoutée à invitations.")
+            else:
+                click.echo("Colonne 'email_sent_at' déjà présente sur invitations.")
 
         # Mise à jour du template d'email : remplacer l'ancien pattern
         # <img src="cid:${qr_cid}"> par ${qr_codes} (bloc multi-QR).

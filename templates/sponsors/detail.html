@@ -93,6 +93,11 @@
                 {% else %}
                   <span class="badge text-bg-light text-dark ms-2">En attente</span>
                 {% endif %}
+                {% if inv.email_sent_at %}
+                  <span class="badge text-bg-info ms-1" title="Envoyé le {{ inv.email_sent_at.strftime('%d/%m/%Y à %H:%M') }}">Email envoyé</span>
+                {% else %}
+                  <span class="badge text-bg-secondary ms-1">Non envoyé</span>
+                {% endif %}
               </div>
               <form method="post" action="{{ url_for('sponsors.rename_invitation', sponsor_id=sponsor.id, invitation_id=inv.id) }}" class="mb-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -101,9 +106,6 @@
                   <input type="email" name="guest_email" class="form-control" value="{{ inv.guest_email or '' }}" placeholder="Email destinataire (facultatif)">
                   <button class="btn btn-outline-primary" type="submit">Enregistrer</button>
                 </div>
-                {% if inv.guest_email %}
-                  <div class="small text-info mt-1">QR envoyé individuellement à {{ inv.guest_email }}</div>
-                {% endif %}
                 <div class="d-flex align-items-center gap-2 mt-1">
                   <select name="invitation_type" class="form-select form-select-sm" style="max-width: 200px;" onchange="this.form.submit()">
                     <option value="SANS_CONSO" {% if inv.invitation_type.name == 'SANS_CONSO' %}selected{% endif %}>Sans consommation</option>
@@ -117,11 +119,17 @@
                   {% endif %}
                 </div>
               </form>
-              <div class="small">
+              <div class="d-flex align-items-center gap-2 small">
                 <a href="{{ url_for('sponsors.qr_png', sponsor_id=sponsor.id, invitation_id=inv.id) }}" download="invitation-{{ inv.number }}.png" class="text-decoration-none">
                   Télécharger PNG
                 </a>
-                <span class="text-muted ms-2">token : <code>{{ inv.token }}</code></span>
+                <form method="post" action="{{ url_for('sponsors.send_invitation_email_single', sponsor_id=sponsor.id, invitation_id=inv.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-outline-success btn-sm py-0" type="submit" title="Envoyer à {{ inv.guest_email or sponsor.contact_email }}">
+                    Envoyer email
+                  </button>
+                </form>
+                <span class="text-muted">token : <code>{{ inv.token }}</code></span>
               </div>
             </div>
           </div>
