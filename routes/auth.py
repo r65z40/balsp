@@ -15,7 +15,7 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user and user.check_password(form.password.data):
-            login_user(user)
+            login_user(user, remember=True)
             log_action("login", f"Connexion de « {user.username} ».")
             db.session.commit()
             next_url = request.args.get("next") or url_for("dashboard.index")

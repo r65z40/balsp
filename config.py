@@ -1,5 +1,6 @@
 """Configuration Flask."""
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -26,5 +27,7 @@ class Config:
     # Admin initial
     ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+
+    REMEMBER_COOKIE_DURATION = timedelta(days=3)
 
     APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:5000")
