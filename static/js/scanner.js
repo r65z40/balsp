@@ -86,7 +86,7 @@
     const gain = ctx.createGain();
     osc.type = type || 'sine';
     osc.frequency.value = freq;
-    gain.gain.value = 0.3;
+    gain.gain.value = 0.7;
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
@@ -103,6 +103,11 @@
   function feedbackWarning() {
     playTone(440, 0.25, 'triangle');
     vibrate([200]);
+  }
+
+  function feedbackScanOk() {
+    playTone(660, 0.1, 'sine');
+    vibrate([50]);
   }
 
   function feedbackError() {
@@ -294,6 +299,7 @@
       feedbackWarning();
       showMessage('warning', `⚠️ Invitation n°${data.invitation.number} déjà utilisée.`);
     } else {
+      feedbackScanOk();
       showMessage('info', `Invitation n°${data.invitation.number} — prête à être pointée.`);
     }
   }
